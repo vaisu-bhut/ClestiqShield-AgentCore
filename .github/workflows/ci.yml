@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["main", "staging"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: clestiq_shield
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Configure Poetry
+        run: |
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/clestiq_shield
+          OTEL_SERVICE_NAME: test-service
+          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+        run: |
+          poetry run pytest --cov=app --cov-report=xml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: docker build . --file Dockerfile --tag clestiq-shield-api:latest
