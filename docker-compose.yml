@@ -9,11 +9,15 @@ services:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/clestiq_shield
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=clestiq-shield-api
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_LOCATION=${GCP_LOCATION:-us-east1}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
     depends_on:
       - db
       - otel-collector
     volumes:
       - ./app:/app/app
+      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
 
   db:
     image: postgres:15-alpine

@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     DD_API_KEY: str | None = None
     DD_SITE: str | None = None
 
+    # Google Cloud / Vertex AI
+    GCP_PROJECT_ID: str
+    GCP_LOCATION: str = "us-east1"
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+
 
     class Config:
         case_sensitive = True
