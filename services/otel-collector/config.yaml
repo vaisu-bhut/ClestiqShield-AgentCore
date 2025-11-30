@@ -1,0 +1,74 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: production
+        action: insert
+
+exporters:
+  logging:
+    loglevel: debug
+
+  datadog:
+    api:
+      site: ${DD_SITE}
+      key: ${DD_API_KEY}
+
+    # Host metadata configuration
+    host_metadata:
+      enabled: true
+      hostname_source: config_or_system
+
+    # Metrics configuration
+    metrics:
+      summaries:
+        mode: gauges
+
+    # Traces configuration
+    traces:
+      span_name_as_resource_name: true
+      compute_stats_by_span_kind: true
+
+    # Logs configuration (if needed later)
+    logs:
+      dump_payloads: false
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [logging, datadog]
+
+    metrics:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [logging, datadog]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [logging, datadog]
+
+  # Extensions for health checks
+  extensions: []
+
+  # Telemetry for the collector itself
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888

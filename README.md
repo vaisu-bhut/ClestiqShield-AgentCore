@@ -111,7 +111,57 @@ pytest tests/agents/ --cov=app.agents.nodes --cov-report=html
 
 ## 🏗️ Architecture
 
-### Agent State
+### Distributed Microservices Architecture
+
+Clestiq Shield is now a **distributed system** with three main services:
+
+```mermaid
+graph TB
+    Client[Client] -->|HTTP Request| Gateway[Gateway Service :8000]
+    Gateway -->|HTTP POST /analyze| Security[Security Agent Service :8001]
+    Security -->|Security Verdict| Gateway
+    Gateway -->|Response| Client
+    
+    Gateway -->|Traces/Metrics/Logs| OTEL[OTEL Collector :4317]
+    Security -->|Traces/Metrics/Logs| OTEL
+    OTEL -->|Export| Datadog[Datadog]
+    
+    Gateway -->|SQL| DB[(PostgreSQL :5432)]
+    
+    style Gateway fill:#4CAF50
+    style Security fill:#2196F3
+    style OTEL fill:#FF9800
+    style Datadog fill:#632CA6
+```
+
+#### Services
+
+1. **Gateway Service** (`services/gateway/`)
+   - Port: 8000
+   - Handles client requests and authentication
+   - Manages database connections
+   - Routes requests to Security Agent
+   - Instrumented with OTEL for tracing
+
+2. **Security Agent Service** (`services/security-agent/`)
+   - Port: 8001
+   - Runs LangGraph security analysis workflow
+   - Performs threat detection and PII redaction
+   - Returns security verdicts
+   - Instrumented with OTEL for tracing
+
+3. **OTEL Collector** (`services/otel-collector/`)
+   - Ports: 4317 (gRPC), 4318 (HTTP)
+   - Collects traces, metrics, and logs from both services
+   - Exports to Datadog for observability
+   - Tracks latency per service
+
+4. **PostgreSQL Database**
+   - Port: 5432
+   - Stores application and API key data
+   - Only accessible by Gateway service
+
+### Security Agent State
 
 The `AgentState` tracks all security analysis results:
 
@@ -126,24 +176,41 @@ class AgentState(TypedDict):
     pii_detections: Optional[List[Dict[str, Any]]]
     redacted_input: Optional[str]
     detected_threats: Optional[List[Dict[str, Any]]]
-    detected_threats: Optional[List[Dict[str, Any]]]
     client_ip: Optional[str]
     user_agent: Optional[str]
 ```
 
-### Security Check Flow
+### Request Flow
 
 ```mermaid
-graph TD
-    A[Request] --> C[Sanitize Input]
-    C --> D[Detect & Redact PII]
-    D --> E[Threat Detection]
-    E --> F{High Confidence Threat?}
-    F -->|Yes| Z[Block]
-    F -->|No| G[LLM Security Check]
-    G --> H{Blocked by LLM?}
-    H -->|Yes| Z
-    H -->|No| I[Process Request]
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant Security
+    participant OTEL
+    participant Datadog
+
+    Client->>Gateway: POST /api/v1/proxy
+    activate Gateway
+    Note over Gateway: Authenticate request
+    
+    Gateway->>Security: POST /analyze
+    activate Security
+    Note over Security: Run security graph
+    Security->>Security: Sanitize → PII → Threats → LLM
+    Security-->>Gateway: Security verdict
+    deactivate Security
+    
+    alt Request Blocked
+        Gateway-->>Client: 400 Bad Request
+    else Request Allowed
+        Gateway-->>Client: 200 OK
+    end
+    deactivate Gateway
+    
+    Gateway->>OTEL: Send traces & metrics
+    Security->>OTEL: Send traces & metrics
+    OTEL->>Datadog: Export telemetry
 ```
 
 ## 🔧 Technology Stack

@@ -19,10 +19,10 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     
     logger.info("Database tables initialized")
-    logger.info("Application startup complete")
+    logger.info("Gateway service startup complete")
     yield
     # Shutdown
-    logger.info("Application shutdown")
+    logger.info("Gateway service shutdown")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -40,10 +40,16 @@ app.include_router(proxy.router, prefix="/api/v1/proxy", tags=["proxy"])
 @app.get("/health")
 async def health_check():
     logger.info("Health check requested")
-    return {"status": "ok", "service": settings.OTEL_SERVICE_NAME}
+    return {
+        "status": "ok",
+        "service": settings.OTEL_SERVICE_NAME,
+        "version": settings.VERSION
+    }
 
 @app.get("/")
 async def root():
     logger.info("Root endpoint accessed")
-    return {"message": "Welcome to Clestiq Shield"}
-
+    return {
+        "message": "Welcome to Clestiq Shield Gateway",
+        "version": settings.VERSION
+    }
