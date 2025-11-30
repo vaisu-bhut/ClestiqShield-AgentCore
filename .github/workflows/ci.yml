@@ -47,6 +47,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/clestiq_shield
           OTEL_SERVICE_NAME: test-service
           OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+          GCP_PROJECT_ID: test-project
         run: |
           poetry run pytest --cov=app --cov-report=xml
 
