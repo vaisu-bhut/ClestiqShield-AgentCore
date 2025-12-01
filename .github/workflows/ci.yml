@@ -15,14 +15,14 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build test environment
-        run: docker-compose -f docker-compose.test.yml build
+        run: docker-compose -f tests/docker-compose.yml build
 
       - name: Run tests
-        run: docker-compose -f docker-compose.test.yml run --rm test
+        run: docker-compose -f tests/docker-compose.yml run --rm test
 
       - name: Clean up
         if: always()
-        run: docker-compose -f docker-compose.test.yml down -v
+        run: docker-compose -f tests/docker-compose.yml down -v
 
   build:
     needs: test

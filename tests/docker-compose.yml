@@ -2,7 +2,7 @@ services:
   # Gateway service for testing
   gateway-test:
     build:
-      context: ./services/gateway
+      context: ../services/gateway
       dockerfile: Dockerfile
     environment:
       - DATABASE_URL=postgresql+asyncpg://test:test@db-test:5432/testdb
@@ -27,7 +27,7 @@ services:
   # Security Agent service for testing
   security-agent-test:
     build:
-      context: ./services/security-agent
+      context: ../services/security-agent
       dockerfile: Dockerfile
     environment:
       - OTEL_SERVICE_NAME=clestiq-shield-security-agent-test
@@ -68,8 +68,8 @@ services:
   # Test runner container
   test:
     build:
-      context: .
-      dockerfile: Dockerfile.test
+      context: ..
+      dockerfile: tests/Dockerfile
     environment:
       - DATABASE_URL=postgresql+asyncpg://test:test@db-test:5432/testdb
       - GATEWAY_URL=http://gateway-test:8000

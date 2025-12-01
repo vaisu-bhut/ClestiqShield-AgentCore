@@ -32,6 +32,6 @@ COPY services/security-agent/app /app/security_agent_service/app
 
 # Copy tests and pytest configuration
 COPY tests /app/tests
-COPY pytest.ini /app/pytest.ini
+COPY tests/pytest.ini /app/pytest.ini
 
 CMD ["pytest", "tests/", "-v"]
