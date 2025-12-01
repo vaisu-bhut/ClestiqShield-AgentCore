@@ -1,0 +1,101 @@
+services:
+  # Gateway service for testing
+  gateway-test:
+    build:
+      context: ../services/gateway
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://test:test@db-test:5432/testdb
+      - OTEL_SERVICE_NAME=clestiq-shield-gateway-test
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+      - SECURITY_SERVICE_URL=http://security-agent-test:8001
+      - TELEMETRY_ENABLED=false
+    depends_on:
+      db-test:
+        condition: service_healthy
+      security-agent-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O- -q http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Security Agent service for testing
+  security-agent-test:
+    build:
+      context: ../services/security-agent
+      dockerfile: Dockerfile
+    environment:
+      - OTEL_SERVICE_NAME=clestiq-shield-security-agent-test
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+      - GCP_PROJECT_ID=test-project
+      - GCP_LOCATION=us-east1
+      - TELEMETRY_ENABLED=false
+      - SECURITY_SANITIZATION_ENABLED=true
+      - SECURITY_PII_REDACTION_ENABLED=true
+      - SECURITY_XSS_PROTECTION_ENABLED=true
+      - SECURITY_SQL_INJECTION_DETECTION_ENABLED=true
+      - SECURITY_COMMAND_INJECTION_DETECTION_ENABLED=true
+      - SECURITY_LLM_CHECK_THRESHOLD=0.85
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O- -q http://localhost:8001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Test database
+  db-test:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_DB=testdb
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d testdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Test runner container
+  test:
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://test:test@db-test:5432/testdb
+      - GATEWAY_URL=http://gateway-test:8000
+      - SECURITY_SERVICE_URL=http://security-agent-test:8001
+      - GCP_PROJECT_ID=test-project
+      - TELEMETRY_ENABLED=false
+      - PYTHONPATH=/app
+    depends_on:
+      gateway-test:
+        condition: service_healthy
+      security-agent-test:
+        condition: service_healthy
+      db-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    command: >
+      sh -c "
+      echo 'Running Security Agent Tests...' &&
+      export PYTHONPATH=/app/security_agent_service &&
+      pytest tests/security_agent -v &&
+      echo 'Running Gateway Tests...' &&
+      export PYTHONPATH=/app/gateway_service &&
+      pytest tests/gateway -v --cov=app --cov-report=html --cov-report=term
+      "
+
+networks:
+  test-network:
+    driver: bridge
