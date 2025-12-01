@@ -2,21 +2,13 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Clestiq Shield"
+    PROJECT_NAME: str = "Clestiq Shield - Security Agent"
     VERSION: str = "1.0.0"
-    API_V1_STR: str = "/api/v1"
-    
-    # Database
-    DATABASE_URL: str
     
     # OpenTelemetry
-    TELEMETRY_ENABLED: bool = True  # Set to False in tests to avoid connection errors
-    OTEL_SERVICE_NAME: str = "clestiq-shield-api"
+    TELEMETRY_ENABLED: bool = True
+    OTEL_SERVICE_NAME: str = "clestiq-shield-security-agent"
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://otel-collector:4317"
-
-    # Datadog (Optional, used by OTel Collector but present in .env)
-    DD_API_KEY: str | None = None
-    DD_SITE: str | None = None
 
     # Google Cloud / Vertex AI
     GCP_PROJECT_ID: str
@@ -30,7 +22,6 @@ class Settings(BaseSettings):
     SECURITY_SQL_INJECTION_DETECTION_ENABLED: bool = True
     SECURITY_COMMAND_INJECTION_DETECTION_ENABLED: bool = True
     SECURITY_LLM_CHECK_THRESHOLD: float = 0.85
-
 
     class Config:
         case_sensitive = True

@@ -49,6 +49,7 @@ def setup_telemetry(app):
     
     resource = Resource.create({
         ResourceAttributes.SERVICE_NAME: settings.OTEL_SERVICE_NAME,
+        ResourceAttributes.SERVICE_VERSION: settings.VERSION,
     })
 
     # Tracing
@@ -77,7 +78,7 @@ def setup_telemetry(app):
     root_logger.handlers = []
 
     # File Handler
-    file_handler = logging.FileHandler("logs/app.log")
+    file_handler = logging.FileHandler("logs/security-agent.log")
     file_formatter = logging.Formatter("%(message)s")
     file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
@@ -111,4 +112,3 @@ def setup_telemetry(app):
     # Log initialization
     log = structlog.get_logger()
     log.info("Telemetry and Structlog initialized", service_name=settings.OTEL_SERVICE_NAME)
-

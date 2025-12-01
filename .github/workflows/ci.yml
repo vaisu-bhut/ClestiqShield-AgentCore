@@ -7,50 +7,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      db:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: clestiq_shield
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+      - name: Build test environment
+        run: docker compose -f tests/docker-compose.yml build
 
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
+      - name: Run tests
+        run: docker compose -f tests/docker-compose.yml run --rm test
 
-      - name: Install dependencies
-        run: poetry install --no-interaction
-
-      - name: Run Tests
-        env:
-          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/clestiq_shield
-          OTEL_SERVICE_NAME: test-service
-          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
-          GCP_PROJECT_ID: test-project
-          TELEMETRY_ENABLED: false
-        run: |
-          poetry run pytest --cov=app --cov-report=xml
+      - name: Clean up
+        if: always()
+        run: docker compose -f tests/docker-compose.yml down -v
 
   build:
     needs: test
@@ -58,5 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag clestiq-shield-api:latest
+      - name: Build Gateway Docker Image
+        run: docker build ./services/gateway --file ./services/gateway/Dockerfile --tag clestiq-shield-gateway:latest
+
+      - name: Build Security Agent Docker Image
+        run: docker build ./services/security-agent --file ./services/security-agent/Dockerfile --tag clestiq-shield-security-agent:latest
