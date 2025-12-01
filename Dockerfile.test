@@ -1,0 +1,37 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install Poetry and curl for healthchecks
+RUN pip install poetry && \
+    apt-get update && \
+    apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy all service pyproject.toml files to install dependencies
+COPY services/gateway/pyproject.toml services/gateway/poetry.lock* /tmp/gateway/
+COPY services/security-agent/pyproject.toml services/security-agent/poetry.lock* /tmp/security-agent/
+
+# Install dependencies from both services
+RUN cd /tmp/gateway && \
+    poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --no-root && \
+    cd /tmp/security-agent && \
+    poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --no-root && \
+    rm -rf /tmp/gateway /tmp/security-agent
+
+# Install additional test dependencies
+RUN pip install pytest pytest-asyncio pytest-cov httpx
+
+# Copy service code - keep original structure for internal imports
+# Gateway service
+COPY services/gateway/app /app/gateway_service/app
+# Security agent service  
+COPY services/security-agent/app /app/security_agent_service/app
+
+# Copy tests and pytest configuration
+COPY tests /app/tests
+COPY pytest.ini /app/pytest.ini
+
+CMD ["pytest", "tests/", "-v"]

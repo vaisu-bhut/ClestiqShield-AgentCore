@@ -2,8 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install Poetry
-RUN pip install poetry
+# Install Poetry and wget for health checks
+RUN pip install poetry && \
+    apt-get update && \
+    apt-get install -y wget && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy poetry configuration
 COPY pyproject.toml poetry.lock* ./
