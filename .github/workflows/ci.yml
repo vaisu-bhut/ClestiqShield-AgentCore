@@ -51,15 +51,31 @@ jobs:
           ELAPSED=0
           INTERVAL=5
 
+          # Get container names dynamically
+          echo "Discovering container names..."
+          GATEWAY_CONTAINER=$(docker compose ps -q gateway)
+          SENTINEL_CONTAINER=$(docker compose ps -q sentinel)
+          GUARDIAN_CONTAINER=$(docker compose ps -q guardian)
+          DB_CONTAINER=$(docker compose ps -q db)
+          OTEL_CONTAINER=$(docker compose ps -q otel-collector)
+
+          echo "Container IDs found:"
+          echo "  Gateway: $GATEWAY_CONTAINER"
+          echo "  Sentinel: $SENTINEL_CONTAINER"
+          echo "  Guardian: $GUARDIAN_CONTAINER"
+          echo "  Database: $DB_CONTAINER"
+          echo "  OTEL Collector: $OTEL_CONTAINER"
+          echo ""
+
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             echo "Checking service health (${ELAPSED}s elapsed)..."
             
-            # Get health status of all services
-            GATEWAY_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' clestiqshield-agentcore-gateway-1 2>/dev/null || echo "not_found")
-            SENTINEL_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' clestiqshield-agentcore-sentinel-1 2>/dev/null || echo "not_found")
-            GUARDIAN_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' clestiqshield-agentcore-guardian-1 2>/dev/null || echo "not_found")
-            DB_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' clestiqshield-agentcore-db-1 2>/dev/null || echo "not_found")
-            OTEL_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' clestiqshield-agentcore-otel-collector-1 2>/dev/null || echo "not_found")
+            # Get health status of all services using container IDs
+            GATEWAY_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $GATEWAY_CONTAINER 2>/dev/null || echo "no_healthcheck")
+            SENTINEL_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $SENTINEL_CONTAINER 2>/dev/null || echo "no_healthcheck")
+            GUARDIAN_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $GUARDIAN_CONTAINER 2>/dev/null || echo "no_healthcheck")
+            DB_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $DB_CONTAINER 2>/dev/null || echo "no_healthcheck")
+            OTEL_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $OTEL_CONTAINER 2>/dev/null || echo "no_healthcheck")
             
             echo "  Gateway: $GATEWAY_HEALTH"
             echo "  Sentinel: $SENTINEL_HEALTH"
