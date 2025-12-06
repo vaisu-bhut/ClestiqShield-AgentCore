@@ -1,9 +1,11 @@
 from typing import Dict, Any
+import time
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from app.agents.state import AgentState
 from app.core.config import get_settings
+from app.core.metrics import get_security_metrics, MetricsDataBuilder
 from app.agents.nodes.sanitizers import InputSanitizer, PIIRedactor
 from app.agents.nodes.threat_detectors import ThreatDetector
 import structlog
@@ -35,13 +37,21 @@ def get_llm():
 
 async def security_check(state: AgentState) -> Dict[str, Any]:
     """
-    Run security checks on the input.
+    Run security checks on the input with comprehensive metrics recording.
     """
-    # settings = get_settings() -> Moved inside try block for fail-safe
+    metrics = get_security_metrics()
+    metrics_builder = MetricsDataBuilder()
+    
+    # Record request start
+    metrics.record_request_start()
+    request_start = time.perf_counter()
+    
     user_input = (state.get("input") or {}).get("prompt", "")
     
     # Handle case where input is None or empty
     if not user_input:
+        latency_ms = (time.perf_counter() - request_start) * 1000
+        metrics.record_request_end(blocked=False, latency_ms=latency_ms, threat_score=0.0)
         return {
             "security_score": 0.0,
             "is_blocked": False,
@@ -51,6 +61,7 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
             "pii_detections": [],
             "redacted_input": "",
             "detected_threats": [],
+            "metrics_data": metrics_builder.build(),
             "client_ip": state.get("client_ip"),
             "user_agent": state.get("user_agent")
         }
@@ -74,22 +85,46 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
         
         # Step 1: Input Sanitization (if enabled)
         if settings.SECURITY_SANITIZATION_ENABLED:
+            stage_start = time.perf_counter()
             sanitized_input, warnings = InputSanitizer.sanitize_input(user_input)
+            stage_latency = (time.perf_counter() - stage_start) * 1000
+            
             result["sanitized_input"] = sanitized_input
             result["sanitization_warnings"] = warnings
-            user_input = sanitized_input  # Use sanitized input for further checks
+            user_input = sanitized_input
+            
+            # Record sanitization metrics
+            metrics.record_stage_latency("sanitization", stage_latency)
+            metrics_builder.add_latency("sanitization", stage_latency)
+            
+            if warnings:
+                logger.info("Sanitization warnings", warnings=warnings)
         
         # Step 2: PII Detection and Redaction (if enabled)
         if settings.SECURITY_PII_REDACTION_ENABLED:
+            stage_start = time.perf_counter()
             redacted_input, pii_detections = PIIRedactor.detect_and_redact_pii(user_input)
+            stage_latency = (time.perf_counter() - stage_start) * 1000
+            
             result["pii_detections"] = pii_detections
             result["redacted_input"] = redacted_input
-            user_input = redacted_input  # Use redacted input for LLM check
+            user_input = redacted_input
             
+            # Record PII metrics
+            metrics.record_stage_latency("pii_detection", stage_latency)
+            metrics_builder.add_latency("pii_detection", stage_latency)
+            
+            for detection in pii_detections:
+                pii_type = detection.get("type", "UNKNOWN")
+                pii_count = detection.get("count", 1)
+                metrics.record_pii_redaction(pii_type, pii_count)
+                metrics_builder.add_pii(pii_type, pii_count)
+                
             if pii_detections:
                 logger.info("PII detected and redacted", detections=pii_detections)
         
         # Step 3: Threat Detection
+        stage_start = time.perf_counter()
         threats = []
         
         # SQL Injection Detection
@@ -115,7 +150,18 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
         if path_threat["detected"]:
             threats.append(path_threat)
         
+        stage_latency = (time.perf_counter() - stage_start) * 1000
+        metrics.record_stage_latency("threat_detection", stage_latency)
+        metrics_builder.add_latency("threat_detection", stage_latency)
+        
         result["detected_threats"] = threats
+        
+        # Record attack metrics for threats
+        for threat in threats:
+            attack_type = threat.get("threat_type", "unknown")
+            confidence = threat.get("confidence", 0.0)
+            metrics.record_attack_prevented(attack_type)
+            metrics_builder.add_attack(attack_type, confidence)
         
         # Block if high-confidence threats detected
         if threats:
@@ -123,15 +169,20 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
             if max_confidence >= 0.7:  # High confidence threat
                 threat_types = [t["threat_type"] for t in threats]
                 logger.warning("High-confidence threats detected", threats=threat_types)
+                
+                latency_ms = (time.perf_counter() - request_start) * 1000
+                metrics.record_request_end(blocked=True, latency_ms=latency_ms, threat_score=max_confidence)
+                
                 return {
                     **result,
                     "security_score": max_confidence,
                     "is_blocked": True,
-                    "block_reason": f"Security threats detected: {', '.join(threat_types)}"
+                    "block_reason": f"Security threats detected: {', '.join(threat_types)}",
+                    "metrics_data": metrics_builder.build()
                 }
         
         # Step 4: LLM-based Security Analysis
-        # Only call LLM if no critical threats found by rule-based detection
+        stage_start = time.perf_counter()
         prompt = ChatPromptTemplate.from_template(SECURITY_PROMPT)
         chain = prompt | get_llm() | JsonOutputParser()
         
@@ -139,6 +190,10 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
             "input": user_input,
             "threshold": settings.SECURITY_LLM_CHECK_THRESHOLD
         })
+        
+        stage_latency = (time.perf_counter() - stage_start) * 1000
+        metrics.record_stage_latency("llm_check", stage_latency)
+        metrics_builder.add_latency("llm_check", stage_latency)
         
         score = llm_result.get("security_score", 0.0)
         is_blocked = llm_result.get("is_blocked", False)
@@ -149,23 +204,41 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
             threat_score = max(t["confidence"] for t in threats)
             score = max(score, threat_score)
         
-        logger.info("Security check complete", score=score, blocked=is_blocked, threats_count=len(threats))
+        final_blocked = is_blocked or score > settings.SECURITY_LLM_CHECK_THRESHOLD
+        
+        # Record final request metrics
+        latency_ms = (time.perf_counter() - request_start) * 1000
+        metrics.record_request_end(blocked=final_blocked, latency_ms=latency_ms, threat_score=score)
+        
+        logger.info(
+            "Security check complete", 
+            score=score, 
+            blocked=final_blocked, 
+            threats_count=len(threats),
+            latency_ms=round(latency_ms, 2)
+        )
         
         return {
             **result,
             "security_score": score,
-            "is_blocked": is_blocked or score > settings.SECURITY_LLM_CHECK_THRESHOLD,
+            "is_blocked": final_blocked,
             "block_reason": reason if is_blocked else (
-                f"Combined security score too high: {score:.2f}" if score > settings.SECURITY_LLM_CHECK_THRESHOLD else None
-            )
+                f"Combined security score too high: {score:.2f}" if final_blocked else None
+            ),
+            "metrics_data": metrics_builder.build()
         }
         
     except Exception as e:
+        latency_ms = (time.perf_counter() - request_start) * 1000
+        metrics.record_request_end(blocked=True, latency_ms=latency_ms, threat_score=1.0)
+        
         logger.error("Security check failed", error=str(e), exc_info=True)
         # Fail safe: block if we can't verify
         return {
             **result,
             "security_score": 1.0,
             "is_blocked": True,
-            "block_reason": "Security verification failed"
+            "block_reason": "Security verification failed",
+            "metrics_data": metrics_builder.build()
         }
+

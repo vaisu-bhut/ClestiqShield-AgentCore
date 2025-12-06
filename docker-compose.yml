@@ -12,11 +12,11 @@ services:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/clestiq_shield
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=clestiq-shield-gateway
-      - SECURITY_SERVICE_URL=http://security-agent:8001
+      - SENTINEL_SERVICE_URL=http://sentinel:8001
       - TELEMETRY_ENABLED=true
     depends_on:
       - db
-      - security-agent
+      - sentinel
       - otel-collector
     volumes:
       - ./services/gateway/app:/app/app
@@ -29,28 +29,38 @@ services:
       retries: 3
       start_period: 40s
 
-  # Security Agent Service
-  security-agent:
+  # Sentinel - Input Security Agent (internal only)
+  sentinel:
     build:
       context: ./services/security-agent
       dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
+    expose:
+      - "8001"
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_SERVICE_NAME=clestiq-shield-security-agent
+      - OTEL_SERVICE_NAME=clestiq-shield-sentinel
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_LOCATION=${GCP_LOCATION:-us-east1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
       - TELEMETRY_ENABLED=true
+      # Security Settings
       - SECURITY_SANITIZATION_ENABLED=true
       - SECURITY_PII_REDACTION_ENABLED=true
       - SECURITY_XSS_PROTECTION_ENABLED=true
       - SECURITY_SQL_INJECTION_DETECTION_ENABLED=true
       - SECURITY_COMMAND_INJECTION_DETECTION_ENABLED=true
       - SECURITY_LLM_CHECK_THRESHOLD=0.85
+      # TOON Conversion
+      - TOON_CONVERSION_ENABLED=true
+      # LLM Settings
+      - LLM_FORWARD_ENABLED=true
+      - LLM_MODEL_NAME=gemini-2.0-flash
+      - LLM_MAX_TOKENS=8192
+      # Guardian Service URL
+      - GUARDIAN_SERVICE_URL=http://guardian:8002
     depends_on:
       - otel-collector
+      - guardian
     volumes:
       - ./services/security-agent/app:/app/app
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
@@ -58,6 +68,40 @@ services:
       - clestiq-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Guardian - Output Validation Agent (internal only)
+  guardian:
+    build:
+      context: ./services/guardian
+      dockerfile: Dockerfile
+    expose:
+      - "8002"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=clestiq-shield-guardian
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_LOCATION=${GCP_LOCATION:-us-east1}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
+      - TELEMETRY_ENABLED=true
+      # Moderation Settings
+      - DEFAULT_MODERATION_MODE=moderate
+      - HARMFUL_CONTENT_THRESHOLD=0.7
+      - INAPPROPRIATE_CONTENT_THRESHOLD=0.6
+      - OUTPUT_PII_DETECTION_ENABLED=true
+      - AUTO_CONVERT_TOON_TO_JSON=true
+    depends_on:
+      - otel-collector
+    volumes:
+      - ./services/guardian/app:/app/app
+      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
+    networks:
+      - clestiq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -92,10 +136,10 @@ services:
     volumes:
       - ./services/otel-collector/config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver
-      - "8888:8888" # Prometheus metrics exposed by the collector
-      - "13133:13133" # health_check extension
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+      - "13133:13133"
     networks:
       - clestiq-network
     healthcheck:

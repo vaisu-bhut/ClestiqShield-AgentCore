@@ -1,19 +1,19 @@
 from pydantic import BaseModel
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-class SecurityAnalysisRequest(BaseModel):
-    """Request schema for security analysis"""
-    input: Dict[str, Any]
+
+class ChatRequest(BaseModel):
+    """Request schema for /chat endpoint."""
+
+    input: Dict[str, Any]  # Contains: prompt, model, moderation, output_format
     client_ip: Optional[str] = None
     user_agent: Optional[str] = None
 
-class SecurityAnalysisResponse(BaseModel):
-    """Response schema for security analysis"""
-    security_score: float
+
+class ChatResponse(BaseModel):
+    """Response schema for /chat endpoint."""
+
     is_blocked: bool
     block_reason: Optional[str] = None
-    sanitized_input: Optional[str] = None
-    sanitization_warnings: Optional[List[str]] = None
-    pii_detections: Optional[List[Dict[str, Any]]] = None
-    redacted_input: Optional[str] = None
-    detected_threats: Optional[List[Dict[str, Any]]] = None
+    llm_response: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None  # Basic metrics for gateway
