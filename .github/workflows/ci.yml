@@ -1,8 +1,11 @@
 name: CI
 
 on:
+  push:
+    branches: ["main", "staging"]
   pull_request:
     branches: ["main", "staging"]
+  workflow_dispatch:
 
 jobs:
   build-and-health-check:
@@ -14,130 +17,49 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Create dummy GCP credentials for CI
-        run: |
-          echo '{
-            "type": "service_account",
-            "project_id": "dummy-project",
-            "private_key_id": "dummy-key-id",
-            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7VJTUt9Us8cKj\nMzEfY4O\n-----END PRIVATE KEY-----\n",
-            "client_email": "dummy@dummy-project.iam.gserviceaccount.com",
-            "client_id": "123456789",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/dummy%40dummy-project.iam.gserviceaccount.com"
-          }' > gcp-credentials.json
-
-      - name: Create .env file for CI
-        run: |
-          echo "GCP_PROJECT_ID=dummy-project" > .env
-          echo "GCP_LOCATION=us-east1" >> .env
-          echo "DD_API_KEY=dummy-key" >> .env
-          echo "DD_SITE=datadoghq.com" >> .env
-
-      - name: Build all services
-        run: docker compose build
-
-      - name: Start all services
-        run: docker compose up -d
-
-      - name: Wait for services to be healthy
-        run: |
-          echo "Waiting for all services to become healthy..."
-
-          # Maximum wait time in seconds (5 minutes)
-          MAX_WAIT=300
-          ELAPSED=0
-          INTERVAL=5
-
-          # Get container names dynamically
-          echo "Discovering container names..."
-          GATEWAY_CONTAINER=$(docker compose ps -q gateway)
-          SENTINEL_CONTAINER=$(docker compose ps -q sentinel)
-          GUARDIAN_CONTAINER=$(docker compose ps -q guardian)
-          DB_CONTAINER=$(docker compose ps -q db)
-
-          echo "Container IDs found:"
-          echo "  Gateway: $GATEWAY_CONTAINER"
-          echo "  Sentinel: $SENTINEL_CONTAINER"
-          echo "  Guardian: $GUARDIAN_CONTAINER"
-          echo "  Database: $DB_CONTAINER"
-          echo ""
-
-          while [ $ELAPSED -lt $MAX_WAIT ]; do
-            echo "Checking service health (${ELAPSED}s elapsed)..."
-            
-            # Get health status of all services using container IDs
-            GATEWAY_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $GATEWAY_CONTAINER 2>/dev/null || echo "no_healthcheck")
-            SENTINEL_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $SENTINEL_CONTAINER 2>/dev/null || echo "no_healthcheck")
-            GUARDIAN_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $GUARDIAN_CONTAINER 2>/dev/null || echo "no_healthcheck")
-            DB_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' $DB_CONTAINER 2>/dev/null || echo "no_healthcheck")
-            
-            echo "  Gateway: $GATEWAY_HEALTH"
-            echo "  Sentinel: $SENTINEL_HEALTH"
-            echo "  Guardian: $GUARDIAN_HEALTH"
-            echo "  Database: $DB_HEALTH"
-            
-            # Check if all services are healthy
-            if [ "$GATEWAY_HEALTH" = "healthy" ] && \
-               [ "$SENTINEL_HEALTH" = "healthy" ] && \
-               [ "$GUARDIAN_HEALTH" = "healthy" ] && \
-               [ "$DB_HEALTH" = "healthy" ]; then
-              echo "✅ All services are healthy!"
-              exit 0
-            fi
-            
-            # Check for unhealthy services
-            if [ "$GATEWAY_HEALTH" = "unhealthy" ] || \
-               [ "$SENTINEL_HEALTH" = "unhealthy" ] || \
-               [ "$GUARDIAN_HEALTH" = "unhealthy" ] || \
-               [ "$DB_HEALTH" = "unhealthy" ]; then
-              echo "❌ One or more services are unhealthy!"
-              docker compose ps
-              docker compose logs
-              exit 1
-            fi
-            
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
-          done
-
-          echo "❌ Timeout waiting for services to become healthy"
-          docker compose ps
-          docker compose logs
-          exit 1
-
-      - name: Verify service health endpoints
-        run: |
-          echo "Testing individual health endpoints..."
-
-          # Test Gateway health endpoint
-          echo "Testing Gateway health endpoint..."
-          curl -f http://localhost:8000/health || (echo "Gateway health check failed" && exit 1)
-
-          # Note: Sentinel and Guardian are internal services (not exposed on host)
-          # Their health is verified via docker inspect in the previous step
-
-          echo "✅ All health endpoints verified!"
-
-      - name: Display service status
+      - name: Authenticate to Google Cloud
         if: success()
-        run: |
-          echo "========================================="
-          echo "Service Status Summary"
-          echo "========================================="
-          docker compose ps
-          echo ""
-          echo "✅ All services built and health checks passed!"
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: "${{ secrets.GCP_SA_KEY }}"
 
-      - name: Show logs on failure
-        if: failure()
+      - name: Set up Cloud SDK
+        if: success()
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Configure Docker for Artifact Registry
+        if: success()
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev
+
+      - name: Build and Push Images to Artifact Registry
+        if: success()
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          REPO: ${{ secrets.GCP_REPO }}
+          REGION: ${{ secrets.GCP_REGION }}
         run: |
-          echo "========================================="
-          echo "Service Logs (Last 100 lines)"
-          echo "========================================="
-          docker compose logs --tail=100
+          echo "Building and Pushing images..."
+
+          # Gateway
+          docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/gateway:${{ github.sha }} ./services/gateway
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/gateway:${{ github.sha }}
+          # Also push 'latest' tag
+          docker tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/gateway:${{ github.sha }} $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/gateway:latest
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/gateway:latest
+
+          # Sentinel (Source is services/security-agent)
+          docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/sentinel:${{ github.sha }} ./services/security-agent
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/sentinel:${{ github.sha }}
+          docker tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/sentinel:${{ github.sha }} $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/sentinel:latest
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/sentinel:latest
+
+          # Guardian
+          docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:${{ github.sha }} ./services/guardian
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:${{ github.sha }}
+          docker tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:${{ github.sha }} $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:latest
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:latest
+
+          echo "✅ All images pushed successfully!"
 
       - name: Clean up
         if: always()
