@@ -29,6 +29,34 @@ services:
       retries: 3
       start_period: 40s
 
+  # EagleEye - Auth & Management Service
+  eagle-eye:
+    build:
+      context: ./services/eagle-eye
+      dockerfile: Dockerfile
+    expose:
+      - "8003"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/clestiq_shield
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=clestiq-shield-eagle-eye
+      - TELEMETRY_ENABLED=true
+      - SECRET_KEY=change_this_to_a_strong_secret_key
+      - ALGORITHM=HS256
+    depends_on:
+      - db
+      - otel-collector
+    volumes:
+      - ./services/eagle-eye/app:/app/app
+    networks:
+      - clestiq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Sentinel - Input Security Agent (internal only)
   sentinel:
     build:
