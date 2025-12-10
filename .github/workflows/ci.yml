@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-health-check:
     runs-on: ubuntu-latest
+    if: github.repository == 'ClestiqShield/AgentCore'
 
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +73,12 @@ jobs:
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:${{ github.sha }}
           docker tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:${{ github.sha }} $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:latest
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/guardian:latest
+
+          # EagleEye
+          docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/eagle-eye:${{ github.sha }} ./services/eagle-eye
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/eagle-eye:${{ github.sha }}
+          docker tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/eagle-eye:${{ github.sha }} $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/eagle-eye:latest
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/eagle-eye:latest
 
           echo "✅ All images pushed successfully!"
 
