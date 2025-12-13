@@ -11,9 +11,10 @@ class AgentState(TypedDict):
     sanitized_input: Optional[str]
     sanitization_warnings: Optional[List[str]]
 
-    # PII Redaction
+    # PII Redaction/Pseudonymization
     pii_detections: Optional[List[Dict[str, Any]]]
     redacted_input: Optional[str]
+    pii_mapping: Optional[Dict[str, str]]  # Token -> Original value map for depseudonymization
 
     # Threat Detection
     detected_threats: Optional[List[Dict[str, Any]]]

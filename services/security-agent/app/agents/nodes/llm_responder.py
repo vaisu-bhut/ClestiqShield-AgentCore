@@ -154,9 +154,20 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "model_used": model_name,
             }
 
+        # Depseudonymization: Replace tokens with original PII values
+        validated_response = guardian_result.get("validated_response", response_text)
+        pii_mapping = state.get("pii_mapping", {})
+
+        if pii_mapping and validated_response:
+            # Replace each token with its original value
+            for token, original_value in pii_mapping.items():
+                validated_response = validated_response.replace(token, original_value)
+
+            logger.info("Depseudonymization complete", tokens_restored=len(pii_mapping))
+
         return {
             **state,
-            "llm_response": guardian_result.get("validated_response", response_text),
+            "llm_response": validated_response,
             "llm_tokens_used": {
                 "input": input_tokens,
                 "output": output_tokens,

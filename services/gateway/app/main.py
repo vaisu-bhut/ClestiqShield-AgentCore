@@ -50,6 +50,7 @@ app.include_router(router_eagleeye.router, prefix="/api/v1/users", tags=["users"
 # So I should disable the local apps router and proxy to EagleEye.
 # app.include_router(apps.router, prefix="/api/v1/apps", tags=["apps"]) # DISABLED
 app.include_router(router_eagleeye.router, prefix="/api/v1/apps", tags=["apps"])
+app.include_router(router_eagleeye.router, prefix="/api/v1/feedback", tags=["feedback"])
 
 
 @app.get("/health")
