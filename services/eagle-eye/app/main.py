@@ -8,7 +8,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 
 from app.core.config import get_settings
-from app.api.v1.endpoints import auth, users, apps, api_keys
+from app.api.v1.endpoints import auth, users, apps, api_keys, feedback
 
 settings = get_settings()
 logger = structlog.get_logger()
@@ -34,7 +34,7 @@ def setup_telemetry(app: FastAPI):
 async def lifespan(app: FastAPI):
     # Startup
     # Import models to register them with Base
-    from app.models import user, app as app_model, api_key
+    from app.models import user, app as app_model, api_key, feedback as feedback_model
     from app.core.db import engine, Base
 
     async with engine.begin() as conn:
@@ -60,6 +60,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(apps.router, prefix="/apps", tags=["apps"])
 app.include_router(api_keys.router, tags=["api-keys"])
+app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
 
 
 @app.get("/health")

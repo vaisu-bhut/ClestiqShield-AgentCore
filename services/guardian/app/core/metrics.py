@@ -120,6 +120,18 @@ class GuardianMetrics:
             self.content_filter_latency.record(latency_ms)
         elif stage == "pii_scan":
             self.pii_scan_latency.record(latency_ms)
+        # NEW: Support for advanced validation stages
+        elif stage in [
+            "hallucination_check",
+            "citation_verification",
+            "tone_check",
+            "disclaimer_injection",
+            "refusal_detection",
+        ]:
+            # Log these under validation_latency for now
+            self.validation_latency.record(latency_ms)
+        else:
+            logger.debug(f"Unknown stage for latency: {stage}")
 
 
 _guardian_metrics: Optional[GuardianMetrics] = None

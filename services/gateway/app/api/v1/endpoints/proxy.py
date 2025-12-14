@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi import APIRouter, Depends, Request, HTTPException, status, Response
 import time
 from typing import Optional
 import httpx
@@ -27,6 +27,7 @@ async def proxy_request(
     request: Request,
     body: GatewayRequest,
     current_app: Application = Depends(deps.get_current_app),
+    response: Response = None,  # Inject Response to set headers
 ):
     """
     Proxy endpoint that accepts structured gateway requests.
@@ -44,6 +45,10 @@ async def proxy_request(
         - response: LLM response content
         - app: Application name
         - metrics: Detailed processing metrics including token usage
+
+    Headers:
+        - X-Security-Decision: Explanation of security decision (passed/blocked)
+        - X-Security-Score: Threat score (0.0-1.0)
     """
     start_time = time.perf_counter()
 
@@ -84,7 +89,7 @@ async def proxy_request(
                     service_url=settings.SENTINEL_SERVICE_URL,
                 )
 
-                response = await client.post(
+                sentinel_response = await client.post(
                     f"{settings.SENTINEL_SERVICE_URL}/chat",
                     json={
                         "input": sentinel_input,
@@ -93,8 +98,8 @@ async def proxy_request(
                     },
                 )
 
-                response.raise_for_status()
-                sentinel_result = response.json()
+                sentinel_response.raise_for_status()
+                sentinel_result = sentinel_response.json()
 
                 logger.info(
                     "Sentinel analysis completed",
@@ -119,25 +124,39 @@ async def proxy_request(
     # Calculate processing time
     processing_time_ms = (time.perf_counter() - start_time) * 1000
 
+    # Extract security decision info
+    is_blocked = sentinel_result.get("is_blocked", False)
+    block_reason = sentinel_result.get("block_reason", "")
+    sentinel_metrics = sentinel_result.get("metrics") or {}
+    security_score = sentinel_metrics.get("security_score", 0.0)
+
+    # Set explainability headers
+    security_headers = {
+        "X-Security-Score": f"{security_score:.3f}",
+        "X-Security-Decision": f"blocked: {block_reason}" if is_blocked else "passed",
+    }
+
+    if response:
+        for header_name, header_value in security_headers.items():
+            response.headers[header_name] = header_value
+
     # Check if blocked
-    if sentinel_result.get("is_blocked"):
+    if is_blocked:
         logger.warning(
             "Request blocked by Sentinel",
             app_name=current_app.name,
-            reason=sentinel_result.get("block_reason"),
+            reason=block_reason,
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "error": "Request blocked",
-                "reason": sentinel_result.get("block_reason"),
+                "reason": block_reason,
             },
+            headers=security_headers,
         )
 
     logger.info("Request passed Sentinel check")
-
-    # Extract metrics from Sentinel response
-    sentinel_metrics = sentinel_result.get("metrics") or {}
 
     # Build token usage if available
     token_usage: Optional[TokenUsage] = None
@@ -151,13 +170,20 @@ async def proxy_request(
 
     # Build response metrics
     response_metrics = ResponseMetrics(
-        security_score=sentinel_metrics.get("security_score", 0.0),
+        security_score=security_score,
         tokens_saved=sentinel_metrics.get("tokens_saved", 0),
         token_usage=token_usage,
         model_used=sentinel_metrics.get("model_used"),
         threats_detected=sentinel_metrics.get("threats_detected", 0),
         pii_redacted=sentinel_metrics.get("pii_redacted", 0),
         processing_time_ms=round(processing_time_ms, 2),
+        # NEW: Guardian validation results
+        hallucination_detected=sentinel_metrics.get("hallucination_detected"),
+        citations_verified=sentinel_metrics.get("citations_verified"),
+        tone_compliant=sentinel_metrics.get("tone_compliant"),
+        disclaimer_injected=sentinel_metrics.get("disclaimer_injected"),
+        false_refusal_detected=sentinel_metrics.get("false_refusal_detected"),
+        toxicity_score=sentinel_metrics.get("toxicity_score"),
     )
 
     # Return the enhanced response

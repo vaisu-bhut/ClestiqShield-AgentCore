@@ -22,6 +22,28 @@ class GuardrailsConfig(BaseModel):
         default=True, description="Enable threat/injection detection"
     )
 
+    # NEW: Advanced Guardian validation features
+    hallucination_check: bool = Field(
+        default=False, description="Enable hallucination detection using Judge LLM"
+    )
+    citation_verification: bool = Field(
+        default=False, description="Enable citation and source verification"
+    )
+    brand_tone: Optional[str] = Field(
+        default=None,
+        description="Enforce brand tone: professional, casual, technical, or friendly",
+    )
+    auto_disclaimers: bool = Field(
+        default=False,
+        description="Automatically inject legal disclaimers for medical/financial advice",
+    )
+    false_refusal_check: bool = Field(
+        default=False, description="Detect when LLM incorrectly refuses valid requests"
+    )
+    toxicity_threshold: float = Field(
+        default=0.7, description="Toxicity threshold (0.0-1.0) for blocking responses"
+    )
+
 
 class GatewayRequest(BaseModel):
     """
@@ -89,6 +111,26 @@ class ResponseMetrics(BaseModel):
     )
     processing_time_ms: Optional[float] = Field(
         default=None, description="Total processing time in milliseconds"
+    )
+
+    # NEW: Guardian validation results
+    hallucination_detected: Optional[bool] = Field(
+        default=None, description="Whether hallucination was detected in LLM response"
+    )
+    citations_verified: Optional[bool] = Field(
+        default=None, description="Whether citations were verified as authentic"
+    )
+    tone_compliant: Optional[bool] = Field(
+        default=None, description="Whether response matches the specified brand tone"
+    )
+    disclaimer_injected: Optional[bool] = Field(
+        default=None, description="Whether a legal disclaimer was automatically added"
+    )
+    false_refusal_detected: Optional[bool] = Field(
+        default=None, description="Whether LLM incorrectly refused a valid request"
+    )
+    toxicity_score: Optional[float] = Field(
+        default=None, description="Toxicity score from 0.0 (safe) to 1.0 (toxic)"
     )
 
 

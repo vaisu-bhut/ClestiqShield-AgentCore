@@ -57,6 +57,8 @@ async def validate(request: ValidateRequest):
         "llm_response": request.llm_response,
         "moderation_mode": request.moderation_mode,
         "output_format": request.output_format,
+        "guardrails": request.guardrails,
+        "original_query": request.original_query,
         "content_filtered": False,
         "content_warnings": [],
         "content_blocked": False,
@@ -70,6 +72,17 @@ async def validate(request: ValidateRequest):
     }
 
     result = await guardian_graph.ainvoke(initial_state)
+
+    # DEBUG: Log what we got back
+    logger.info(
+        "Graph execution complete",
+        hallucination_detected=result.get("hallucination_detected"),
+        citations_verified=result.get("citations_verified"),
+        tone_compliant=result.get("tone_compliant"),
+        disclaimer_injected=result.get("disclaimer_injected"),
+        false_refusal_detected=result.get("false_refusal_detected"),
+        toxicity_score=result.get("toxicity_score"),
+    )
 
     # Determine validation result
     validation_passed = not result.get("content_blocked", False)
@@ -96,6 +109,18 @@ async def validate(request: ValidateRequest):
         output_pii_leaks=result.get("output_pii_leaks"),
         output_redacted=result.get("output_redacted", False),
         was_toon=result.get("was_toon", False),
+        # NEW: Advanced validation results
+        hallucination_detected=result.get("hallucination_detected"),
+        hallucination_details=result.get("hallucination_details"),
+        citations_verified=result.get("citations_verified"),
+        fake_citations=result.get("fake_citations"),
+        tone_compliant=result.get("tone_compliant"),
+        tone_violation_reason=result.get("tone_violation_reason"),
+        disclaimer_injected=result.get("disclaimer_injected"),
+        disclaimer_text=result.get("disclaimer_text"),
+        false_refusal_detected=result.get("false_refusal_detected"),
+        toxicity_score=result.get("toxicity_score"),
+        toxicity_details=result.get("toxicity_details"),
         metrics={
             "moderation_mode": request.moderation_mode,
             "warnings_count": len(result.get("content_warnings", [])),

@@ -141,7 +141,28 @@ async def content_filter_node(state: Dict[str, Any]) -> Dict[str, Any]:
     # Pattern-based filtering first (fast)
     pattern_results = pattern_based_filter(llm_response)
 
-    # LLM analysis for edge cases (if patterns didn't catch anything)
+    # Guardrails for toxicity threshold
+    guardrails = state.get("guardrails") or {}
+    toxicity_threshold = guardrails.get("toxicity_threshold", 0.7)
+
+    # LLM-based toxicity scoring (NEW)
+    toxicity_score = 0.0
+    toxicity_details = {}
+
+    if any(detection["detected"] for detection in pattern_results.values()):
+        # Use LLM for precise toxicity scoring
+        try:
+            toxicity_result = await llm_toxicity_scoring(llm_response)
+            toxicity_score = toxicity_result.get("toxicity_score", 0.0)
+            toxicity_details = toxicity_result
+        except Exception as e:
+            logger.error("LLM toxicity scoring failed", error=str(e))
+            # Fallback to pattern-based confidence
+            max_confidence = max(
+                (d.get("confidence", 0.0) for d in pattern_results.values())
+            )
+            toxicity_score = max_confidence
+
     content_issues = []
     blocked = False
     warnings = []
@@ -157,6 +178,13 @@ async def content_filter_node(state: Dict[str, Any]) -> Dict[str, Any]:
             elif action == "warn":
                 warnings.append(f"{category}: flagged for review")
 
+    # Block if toxicity score exceeds threshold
+    if toxicity_score >= toxicity_threshold:
+        blocked = True
+        content_issues.append(
+            f"toxicity score {toxicity_score:.2f} exceeds threshold {toxicity_threshold}"
+        )
+
     latency_ms = (time.perf_counter() - start_time) * 1000
     metrics.record_latency("content_filter", latency_ms)
 
@@ -165,6 +193,7 @@ async def content_filter_node(state: Dict[str, Any]) -> Dict[str, Any]:
         mode=moderation_mode,
         blocked=blocked,
         warnings=len(warnings),
+        toxicity_score=toxicity_score,
         latency_ms=round(latency_ms, 2),
     )
 
@@ -174,4 +203,39 @@ async def content_filter_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "content_warnings": warnings,
         "content_blocked": blocked,
         "content_block_reason": "; ".join(content_issues) if blocked else None,
+        "toxicity_score": toxicity_score if toxicity_score > 0 else None,
+        "toxicity_details": toxicity_details if toxicity_details else None,
     }
+
+
+async def llm_toxicity_scoring(text: str) -> Dict[str, Any]:
+    """Use LLM to score toxicity on a 0.0-1.0 scale."""
+    try:
+        TOXICITY_PROMPT = """
+        Rate the toxicity of this text on a scale from 0.0 (not toxic) to 1.0 (extremely toxic).
+        
+        Text: {text}
+        
+        Consider:
+        - Hate speech, discrimination
+        - Violence, threats
+        - Sexual content
+        - Profanity
+        - Harassment
+        
+        Respond with JSON:
+        {{
+          "toxicity_score": float (0.0-1.0),
+          "categories": ["list of toxic categories found"]
+        }}
+        
+        Output ONLY JSON.
+        """
+
+        prompt = ChatPromptTemplate.from_template(TOXICITY_PROMPT)
+        chain = prompt | get_content_llm() | JsonOutputParser()
+        result = await chain.ainvoke({"text": text})
+        return result
+    except Exception as e:
+        logger.error("LLM toxicity scoring error", error=str(e))
+        return {"toxicity_score": 0.0, "categories": []}

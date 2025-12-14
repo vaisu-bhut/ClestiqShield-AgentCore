@@ -5,7 +5,7 @@ Routes queries to Gemini models via Vertex AI.
 """
 
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.messages import HumanMessage, SystemMessage
 import httpx
@@ -55,6 +55,8 @@ async def call_guardian(
     llm_response: str,
     moderation_mode: str = "moderate",
     output_format: str = "json",
+    guardrails: Optional[Dict[str, Any]] = None,
+    original_query: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Call Guardian for output validation."""
     settings = get_settings()
@@ -67,6 +69,8 @@ async def call_guardian(
                     "llm_response": llm_response,
                     "moderation_mode": moderation_mode,
                     "output_format": output_format,
+                    "guardrails": guardrails,
+                    "original_query": original_query,
                 },
             )
             response.raise_for_status()
@@ -143,7 +147,25 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
         logger.info("LLM response", model=model_name, latency_ms=round(llm_latency, 2))
 
         # Guardian validation
-        guardian_result = await call_guardian(response_text, moderation, output_format)
+        guardrails = input_data.get("guardrails", {})
+        original_query = input_data.get("prompt", "")
+
+        guardian_result = await call_guardian(
+            response_text,
+            moderation,
+            output_format,
+            guardrails=guardrails,
+            original_query=original_query,
+        )
+
+        # DEBUG: Log what Guardian returned
+        logger.info(
+            "Guardian result received",
+            hallucination_detected=guardian_result.get("hallucination_detected"),
+            citations_verified=guardian_result.get("citations_verified"),
+            disclaimer_injected=guardian_result.get("disclaimer_injected"),
+            has_validated_response=bool(guardian_result.get("validated_response")),
+        )
 
         if guardian_result.get("content_blocked"):
             return {
@@ -154,15 +176,35 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "model_used": model_name,
             }
 
+        # Depseudonymization: Replace tokens with original PII values
+        validated_response = guardian_result.get("validated_response", response_text)
+        pii_mapping = state.get("pii_mapping", {})
+
+        if pii_mapping and validated_response:
+            # Replace each token with its original value
+            for token, original_value in pii_mapping.items():
+                validated_response = validated_response.replace(token, original_value)
+
+            logger.info("Depseudonymization complete", tokens_restored=len(pii_mapping))
+
         return {
             **state,
-            "llm_response": guardian_result.get("validated_response", response_text),
+            "llm_response": validated_response,
             "llm_tokens_used": {
                 "input": input_tokens,
                 "output": output_tokens,
                 "total": input_tokens + output_tokens,
             },
             "model_used": model_name,
+            # NEW: Guardian validation results
+            "guardian_validation": {
+                "hallucination_detected": guardian_result.get("hallucination_detected"),
+                "citations_verified": guardian_result.get("citations_verified"),
+                "tone_compliant": guardian_result.get("tone_compliant"),
+                "disclaimer_injected": guardian_result.get("disclaimer_injected"),
+                "false_refusal_detected": guardian_result.get("false_refusal_detected"),
+                "toxicity_score": guardian_result.get("toxicity_score"),
+            },
         }
 
     except Exception as e:

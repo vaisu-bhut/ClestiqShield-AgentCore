@@ -68,6 +68,9 @@ async def chat(request: ChatRequest):
             tokens_saved=result.get("token_savings", 0),
         )
 
+    # Extract Guardian validation results
+    guardian_validation = result.get("guardian_validation", {})
+
     return ChatResponse(
         is_blocked=result.get("is_blocked", False),
         block_reason=result.get("block_reason"),
@@ -79,5 +82,12 @@ async def chat(request: ChatRequest):
             "model_used": result.get("model_used"),
             "threats_detected": len(result.get("detected_threats", [])),
             "pii_redacted": len(result.get("pii_detections", [])),
+            # NEW: Guardian validation results
+            "hallucination_detected": guardian_validation.get("hallucination_detected"),
+            "citations_verified": guardian_validation.get("citations_verified"),
+            "tone_compliant": guardian_validation.get("tone_compliant"),
+            "disclaimer_injected": guardian_validation.get("disclaimer_injected"),
+            "false_refusal_detected": guardian_validation.get("false_refusal_detected"),
+            "toxicity_score": guardian_validation.get("toxicity_score"),
         },
     )
