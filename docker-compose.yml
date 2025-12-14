@@ -161,6 +161,7 @@ services:
     environment:
       - DD_API_KEY=${DD_API_KEY}
       - DD_SITE=${DD_SITE:-datadoghq.com}
+      - DEPLOYMENT_ENV=development
     volumes:
       - ./services/otel-collector/config.yaml:/etc/otel-collector-config.yaml:ro
     ports:

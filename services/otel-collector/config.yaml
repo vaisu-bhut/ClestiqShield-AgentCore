@@ -14,7 +14,7 @@ processors:
   resource:
     attributes:
       - key: deployment.environment
-        value: production
+        value: ${env:DEPLOYMENT_ENV}
         action: insert
 
 exporters:
