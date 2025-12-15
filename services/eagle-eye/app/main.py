@@ -11,11 +11,15 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 
 from app.core.config import get_settings
 from app.core.telemetry import setup_logging
-from app.api.v1.endpoints import auth, users, apps, api_keys, feedback
 
 settings = get_settings()
+
+# Setup logging BEFORE importing endpoints
 setup_logging()
 logger = structlog.get_logger()
+
+# Import endpoints after logging is configured
+from app.api.v1.endpoints import auth, users, apps, api_keys, feedback
 
 
 # Setup Telemetry
