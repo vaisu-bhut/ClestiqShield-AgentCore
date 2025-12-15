@@ -44,10 +44,13 @@ def setup_telemetry(app):
     if not settings.TELEMETRY_ENABLED:
         return
 
+    import socket
+
     resource = Resource.create(
         {
             ResourceAttributes.SERVICE_NAME: settings.OTEL_SERVICE_NAME,
             ResourceAttributes.SERVICE_VERSION: settings.VERSION,
+            ResourceAttributes.HOST_NAME: socket.gethostname(),
         }
     )
 

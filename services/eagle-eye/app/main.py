@@ -5,7 +5,9 @@ from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+# Use HTTP Exporter for Traces (port 4318)
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
 from app.core.config import get_settings
 from app.core.telemetry import setup_logging
@@ -21,9 +23,11 @@ def setup_telemetry(app: FastAPI):
     if settings.TELEMETRY_ENABLED:
         resource = Resource(attributes={"service.name": settings.OTEL_SERVICE_NAME})
         trace.set_tracer_provider(TracerProvider(resource=resource))
-        otlp_exporter = OTLPSpanExporter(
-            endpoint=settings.OTEL_EXPORTER_OTLP_ENDPOINT, insecure=True
-        )
+        # HTTP Exporter endpoint usually expects /v1/traces appended or handled by class
+        # OTLPSpanExporter (HTTP) defaults to v1/traces if not present?
+        # Let's be explicit: endpoint/v1/traces
+        endpoint = f"{settings.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces"
+        otlp_exporter = OTLPSpanExporter(endpoint=endpoint)
         span_processor = BatchSpanProcessor(otlp_exporter)
         trace.get_tracer_provider().add_span_processor(span_processor)
         # Instrument FastAPI

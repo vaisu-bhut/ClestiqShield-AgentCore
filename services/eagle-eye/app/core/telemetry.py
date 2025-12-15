@@ -36,10 +36,13 @@ def setup_logging():
         return
 
     # Create Resource
+    import socket
+
     resource = Resource.create(
         {
             ResourceAttributes.SERVICE_NAME: settings.OTEL_SERVICE_NAME,
             ResourceAttributes.SERVICE_VERSION: settings.VERSION,
+            ResourceAttributes.HOST_NAME: socket.gethostname(),
         }
     )
 

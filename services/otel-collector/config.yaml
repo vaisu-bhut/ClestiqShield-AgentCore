@@ -11,11 +11,19 @@ processors:
     timeout: 10s
     send_batch_size: 1024
 
+  # Resource processor to ensure deployment.environment is set
   resource:
     attributes:
       - key: deployment.environment
         value: ${env:DEPLOYMENT_ENV}
         action: insert
+
+      # Datadog Tagging Improvements
+
+      # 1. Source Tag: Datadog looks for 'ddsource'
+      - key: ddsource
+        value: clestiq-shield
+        action: upsert
 
 exporters:
   logging:
@@ -27,9 +35,10 @@ exporters:
       key: ${DD_API_KEY}
 
     # Host metadata configuration
+    # 'first_resource' uses the host.name we added to Python resources.
     host_metadata:
       enabled: true
-      hostname_source: config_or_system
+      hostname_source: first_resource
 
     # Metrics configuration
     metrics:
@@ -41,7 +50,7 @@ exporters:
       span_name_as_resource_name: true
       compute_stats_by_span_kind: true
 
-    # Logs configuration (if needed later)
+    # Logs configuration
     logs:
       dump_payloads: false
 
