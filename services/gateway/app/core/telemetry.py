@@ -109,6 +109,10 @@ def setup_telemetry(app):
         handlers=[otlp_handler, stdout_handler],
     )
 
+    # Force uvicorn logs to use OTLP handler
+    logging.getLogger("uvicorn.access").handlers = [otlp_handler, stdout_handler]
+    logging.getLogger("uvicorn.error").handlers = [otlp_handler, stdout_handler]
+
     # Instrument FastAPI
     FastAPIInstrumentor.instrument_app(
         app, tracer_provider=trace_provider, meter_provider=meter_provider

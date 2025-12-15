@@ -85,3 +85,7 @@ def setup_logging():
         level=logging.INFO,
         handlers=[otlp_handler, stdout_handler],
     )
+
+    # Force uvicorn logs to use OTLP handler
+    logging.getLogger("uvicorn.access").handlers = [otlp_handler, stdout_handler]
+    logging.getLogger("uvicorn.error").handlers = [otlp_handler, stdout_handler]
