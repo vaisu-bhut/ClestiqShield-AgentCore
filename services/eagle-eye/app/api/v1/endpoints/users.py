@@ -6,39 +6,42 @@ from app.models.user import User
 from app.schemas import UserResponse, UserUpdate
 from app.api.deps import get_current_user
 import structlog
-from typing import List
 
 router = APIRouter()
 logger = structlog.get_logger()
 
-# Dependencies to get current user would go here (verifying Firebase Token)
-# For now, assuming endpoints are protected by Gateway or unimplemented middleware
-# We will add a placeholder for current_user dependency
 
-
-async def get_current_user_placeholder(db: AsyncSession = Depends(get_db)):
-    # Placeholder: In real implementation, parse Bearer token -> verify firebase -> get DB user
-    # For initial skeleton, returning first user or error
-    # This needs proper implementation for real security
-    return None
-
-
-@router.get("/", response_model=List[UserResponse])
-async def list_users(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
+@router.patch("/", response_model=UserResponse)
+async def update_user(
+    user_in: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).offset(skip).limit(limit))
-    users = result.scalars().all()
-    return users
+    """
+    Update current user profile.
+    """
+    if user_in.full_name is not None:
+        current_user.full_name = user_in.full_name
+
+    if user_in.is_active is not None:
+        current_user.is_active = user_in.is_active
+
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalars().first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+async def get_user(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if str(current_user.id) != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
+        )
+    return current_user
 
 
 @router.delete("/account-closure", status_code=status.HTTP_204_NO_CONTENT)
