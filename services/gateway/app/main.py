@@ -6,10 +6,7 @@ from app.core.config import get_settings
 from app.core.telemetry import setup_telemetry
 
 settings = get_settings()
-logger = structlog.get_logger()
-
 from app.core.db import engine, Base
-from app.api.v1.endpoints import proxy, router_eagleeye
 
 
 @asynccontextmanager
@@ -20,6 +17,7 @@ async def lifespan(app: FastAPI):
     from app.models.application import Application
     from app.models.api_key import ApiKey
 
+    # Use local logger or ensured global logger
     logger.info("Database tables initialized (skipped in Gateway)")
     logger.info("Gateway service startup complete")
     yield
@@ -28,6 +26,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)
+
+# Setup telemetry IMMEDIATELY
+setup_telemetry(app)
+
+# Initialize global logger AFTER telemetry setup
+logger = structlog.get_logger()
+
+# Import endpoints AFTER logging is configured
+from app.api.v1.endpoints import proxy, router_eagleeye
 
 # Setup telemetry after app creation but before startup
 setup_telemetry(app)

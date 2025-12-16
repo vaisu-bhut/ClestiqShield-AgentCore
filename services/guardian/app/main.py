@@ -4,12 +4,8 @@ import structlog
 
 from app.core.config import get_settings
 from app.core.telemetry import setup_telemetry
-from app.core.metrics import get_guardian_metrics
-from app.schemas.validation import ValidateRequest, ValidateResponse
-from app.agents.graph import guardian_graph
 
 settings = get_settings()
-logger = structlog.get_logger()
 
 
 @asynccontextmanager
@@ -22,7 +18,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)
 
+# Setup telemetry IMMEDIATELY
 setup_telemetry(app)
+
+# Initialize global logger after telemetry
+logger = structlog.get_logger()
+
+# Import modules AFTER logging is configured to ensure they use the correct logger factory
+from app.agents.graph import guardian_graph
+from app.schemas.validation import ValidateRequest, ValidateResponse
+from app.core.metrics import get_guardian_metrics
 
 
 @app.get("/health")
