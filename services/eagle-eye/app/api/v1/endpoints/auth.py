@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.core.db import get_db
 from app.core.security import verify_password, create_access_token, get_password_hash
 from app.models.user import User
-from app.schemas import UserCreate, UserResponse, Token
+from app.schemas import UserCreate, UserResponse, TokenWithUser
 from datetime import timedelta
 import structlog
 
@@ -41,7 +41,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     return new_user
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=TokenWithUser)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -61,4 +61,4 @@ async def login(
         data={"sub": user.email, "user_id": str(user.id)}
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}

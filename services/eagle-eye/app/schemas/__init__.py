@@ -14,12 +14,13 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
     is_active: Optional[bool] = None
 
 
 class UserResponse(UserBase):
     id: UUID
+    full_name: Optional[str] = None
     is_active: bool
     created_at: datetime
 
@@ -73,9 +74,15 @@ class ApiKeySecret(ApiKeyResponse):
 
 
 # --- Auth Schemas ---
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class TokenWithUser(Token):
+    user_id: UUID
 
 
 class TokenData(BaseModel):

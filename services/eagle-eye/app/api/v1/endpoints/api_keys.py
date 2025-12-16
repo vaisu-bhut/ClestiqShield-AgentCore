@@ -30,6 +30,12 @@ async def create_api_key(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
+    if app.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+
     # Generate Key
     plain_key = generate_api_key()
     key_hash = hash_api_key(plain_key)
@@ -59,13 +65,43 @@ async def create_api_key(
 
 
 @router.get("/apps/{app_id}/keys", response_model=List[ApiKeyResponse])
-async def list_api_keys(app_id: str, db: AsyncSession = Depends(get_db)):
+async def list_api_keys(
+    app_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Verify app ownership
+    result_app = await db.execute(select(Application).where(Application.id == app_id))
+    app = result_app.scalars().first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if app.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+
     result = await db.execute(select(ApiKey).where(ApiKey.application_id == app_id))
     return result.scalars().all()
 
 
 @router.delete("/apps/{app_id}/keys/{key_id}")
-async def revoke_api_key(app_id: str, key_id: str, db: AsyncSession = Depends(get_db)):
+async def revoke_api_key(
+    app_id: str,
+    key_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Verify app ownership first
+    result_app = await db.execute(select(Application).where(Application.id == app_id))
+    app = result_app.scalars().first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if app.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
     result = await db.execute(
         select(ApiKey).where(ApiKey.id == key_id, ApiKey.application_id == app_id)
     )
