@@ -82,8 +82,8 @@ class Token(BaseModel):
 
 
 class TokenWithUser(Token):
-    user_id: UUID
+    user: UserResponse
 
 
 class TokenData(BaseModel):
-    email: Optional[str] = None
+    user_id: Optional[UUID] = None

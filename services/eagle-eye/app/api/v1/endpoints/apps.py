@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.db import get_db
 from app.models.app import Application
-from app.models.user import User
 from app.schemas import ApplicationCreate, ApplicationResponse, ApplicationUpdate
 import structlog
 from typing import List
@@ -16,14 +16,14 @@ logger = structlog.get_logger()
 @router.post("/", response_model=ApplicationResponse)
 async def create_app(
     app_in: ApplicationCreate,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     # TODO: Link to actual current user
     # For now, create unlinked or link to a test user if exists
 
     new_app = Application(
-        name=app_in.name, description=app_in.description, owner_id=current_user.id
+        name=app_in.name, description=app_in.description, owner_id=user_id
     )
     db.add(new_app)
     try:
@@ -44,12 +44,12 @@ async def create_app(
 async def list_apps(
     skip: int = 0,
     limit: int = 100,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(Application)
-        .where(Application.owner_id == current_user.id)
+        .where(Application.owner_id == user_id)
         .offset(skip)
         .limit(limit)
     )
@@ -59,7 +59,7 @@ async def list_apps(
 @router.get("/{app_id}", response_model=ApplicationResponse)
 async def get_app(
     app_id: str,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Application).where(Application.id == app_id))
@@ -67,7 +67,7 @@ async def get_app(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    if app.owner_id != current_user.id:
+    if app.owner_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
@@ -79,7 +79,7 @@ async def get_app(
 async def update_app(
     app_id: str,
     app_in: ApplicationUpdate,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Application).where(Application.id == app_id))
@@ -87,7 +87,7 @@ async def update_app(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    if app.owner_id != current_user.id:
+    if app.owner_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
@@ -106,7 +106,7 @@ async def update_app(
 @router.delete("/{app_id}")
 async def delete_app(
     app_id: str,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Application).where(Application.id == app_id))
@@ -114,7 +114,7 @@ async def delete_app(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    if app.owner_id != current_user.id:
+    if app.owner_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.db import get_db
@@ -14,12 +15,17 @@ logger = structlog.get_logger()
 @router.patch("/", response_model=UserResponse)
 async def update_user(
     user_in: UserUpdate,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Update current user profile.
     """
+    result = await db.execute(select(User).where(User.id == user_id))
+    current_user = result.scalars().first()
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     if user_in.full_name is not None:
         current_user.full_name = user_in.full_name
 
@@ -31,22 +37,20 @@ async def update_user(
     return current_user
 
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/", response_model=UserResponse)
 async def get_user(
-    user_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if str(current_user.id) != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
-        )
-    return current_user
+    result = await db.execute(select(User).where(User.id == current_user_id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="User not found")
+    return result.scalars().first()
 
 
 @router.delete("/account-closure", status_code=status.HTTP_204_NO_CONTENT)
 async def close_account(
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -57,7 +61,7 @@ async def close_account(
     from app.models.app import Application
 
     app_result = await db.execute(
-        select(Application).where(Application.owner_id == current_user.id)
+        select(Application).where(Application.owner_id == user_id)
     )
     existing_apps = app_result.scalars().all()
 
@@ -68,6 +72,9 @@ async def close_account(
         )
 
     # 2. Delete user
-    await db.delete(current_user)
+    result = await db.execute(select(User).where(User.id == user_id))
+    current_user = result.scalars().first()
+    if current_user:
+        await db.delete(current_user)
     await db.commit()
     return None

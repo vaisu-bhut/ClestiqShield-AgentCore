@@ -57,8 +57,6 @@ async def login(
         )
 
     # Create Token
-    access_token = create_access_token(
-        data={"sub": user.email, "user_id": str(user.id)}
-    )
+    access_token = create_access_token(data={"sub": str(user.id)})
 
-    return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}
+    return {"access_token": access_token, "token_type": "bearer", "user": user}

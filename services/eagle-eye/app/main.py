@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import structlog
 from opentelemetry import trace
@@ -17,6 +18,9 @@ settings = get_settings()
 # Setup logging BEFORE importing endpoints
 setup_logging()
 logger = structlog.get_logger()
+
+from app.api.deps import get_current_user
+from fastapi import Depends
 
 # Import endpoints after logging is configured
 from app.api.v1.endpoints import auth, users, apps, api_keys
@@ -64,12 +68,32 @@ app = FastAPI(
     root_path=settings.API_V1_STR,  # Since it's proxied behind /api/v1/auth etc, might need adjustment, but usually handled by gateway stripping prefix
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 setup_telemetry(app)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(users.router, prefix="/users", tags=["users"])
-app.include_router(apps.router, prefix="/apps", tags=["apps"])
-app.include_router(api_keys.router, tags=["api-keys"])
+app.include_router(
+    users.router,
+    prefix="/users",
+    tags=["users"],
+    dependencies=[Depends(get_current_user)],
+)
+app.include_router(
+    apps.router,
+    prefix="/apps",
+    tags=["apps"],
+    dependencies=[Depends(get_current_user)],
+)
+app.include_router(
+    api_keys.router, tags=["api-keys"], dependencies=[Depends(get_current_user)]
+)
 
 
 @app.get("/health")

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.db import get_db
@@ -13,7 +14,6 @@ router = APIRouter()
 logger = structlog.get_logger()
 
 
-from app.models.user import User
 from app.api.deps import get_current_user
 
 
@@ -21,7 +21,7 @@ from app.api.deps import get_current_user
 async def create_api_key(
     app_id: str,
     key_in: ApiKeyCreate,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     # Verify app exists
@@ -30,7 +30,7 @@ async def create_api_key(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    if app.owner_id != current_user.id:
+    if app.owner_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
@@ -67,7 +67,7 @@ async def create_api_key(
 @router.get("/apps/{app_id}/keys", response_model=List[ApiKeyResponse])
 async def list_api_keys(
     app_id: str,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     # Verify app ownership
@@ -75,7 +75,7 @@ async def list_api_keys(
     app = result_app.scalars().first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
-    if app.owner_id != current_user.id:
+    if app.owner_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
@@ -89,7 +89,7 @@ async def list_api_keys(
 async def revoke_api_key(
     app_id: str,
     key_id: str,
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     # Verify app ownership first
@@ -97,7 +97,7 @@ async def revoke_api_key(
     app = result_app.scalars().first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
-    if app.owner_id != current_user.id:
+    if app.owner_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
