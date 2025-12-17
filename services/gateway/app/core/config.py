@@ -10,10 +10,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
 
-    # OpenTelemetry
+    # Datadog APM
     TELEMETRY_ENABLED: bool = True
-    OTEL_SERVICE_NAME: str = "clestiq-shield-gateway"
-    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://otel-collector:4317"
+    DD_SERVICE: str = "clestiq-shield-gateway"
+    DD_ENV: str = "production"
+    DD_VERSION: str = "1.0.0"
 
     # Sentinel Service (Input Security)
     SENTINEL_SERVICE_URL: str = "http://sentinel:8001"

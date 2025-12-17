@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.db import get_db
@@ -6,44 +7,50 @@ from app.models.user import User
 from app.schemas import UserResponse, UserUpdate
 from app.api.deps import get_current_user
 import structlog
-from typing import List
 
 router = APIRouter()
 logger = structlog.get_logger()
 
-# Dependencies to get current user would go here (verifying Firebase Token)
-# For now, assuming endpoints are protected by Gateway or unimplemented middleware
-# We will add a placeholder for current_user dependency
 
-
-async def get_current_user_placeholder(db: AsyncSession = Depends(get_db)):
-    # Placeholder: In real implementation, parse Bearer token -> verify firebase -> get DB user
-    # For initial skeleton, returning first user or error
-    # This needs proper implementation for real security
-    return None
-
-
-@router.get("/", response_model=List[UserResponse])
-async def list_users(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
+@router.patch("/", response_model=UserResponse)
+async def update_user(
+    user_in: UserUpdate,
+    user_id: UUID = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).offset(skip).limit(limit))
-    users = result.scalars().all()
-    return users
-
-
-@router.get("/{user_id}", response_model=UserResponse)
-async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Update current user profile.
+    """
     result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalars().first()
-    if not user:
+    current_user = result.scalars().first()
+    if not current_user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+
+    if user_in.full_name is not None:
+        current_user.full_name = user_in.full_name
+
+    if user_in.is_active is not None:
+        current_user.is_active = user_in.is_active
+
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.get("/", response_model=UserResponse)
+async def get_user(
+    current_user_id: UUID = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == current_user_id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="User not found")
+    return result.scalars().first()
 
 
 @router.delete("/account-closure", status_code=status.HTTP_204_NO_CONTENT)
 async def close_account(
-    current_user: User = Depends(get_current_user),
+    user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -54,7 +61,7 @@ async def close_account(
     from app.models.app import Application
 
     app_result = await db.execute(
-        select(Application).where(Application.owner_id == current_user.id)
+        select(Application).where(Application.owner_id == user_id)
     )
     existing_apps = app_result.scalars().all()
 
@@ -65,6 +72,9 @@ async def close_account(
         )
 
     # 2. Delete user
-    await db.delete(current_user)
+    result = await db.execute(select(User).where(User.id == user_id))
+    current_user = result.scalars().first()
+    if current_user:
+        await db.delete(current_user)
     await db.commit()
     return None

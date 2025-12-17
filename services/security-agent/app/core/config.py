@@ -6,10 +6,11 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Clestiq Shield - Sentinel (Input Security)"
     VERSION: str = "1.0.0"
 
-    # OpenTelemetry
+    # Datadog APM
     TELEMETRY_ENABLED: bool = True
-    OTEL_SERVICE_NAME: str = "clestiq-shield-sentinel"
-    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://otel-collector:4317"
+    DD_SERVICE: str = "clestiq-shield-sentinel"
+    DD_ENV: str = "production"
+    DD_VERSION: str = "1.0.0"
 
     # Google Cloud / Vertex AI
     GCP_PROJECT_ID: str
