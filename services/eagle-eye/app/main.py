@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import structlog
 from opentelemetry import trace
@@ -65,6 +66,14 @@ app = FastAPI(
     version=settings.VERSION,
     lifespan=lifespan,
     root_path=settings.API_V1_STR,  # Since it's proxied behind /api/v1/auth etc, might need adjustment, but usually handled by gateway stripping prefix
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 setup_telemetry(app)
