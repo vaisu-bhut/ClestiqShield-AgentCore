@@ -16,10 +16,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # OpenTelemetry
+    # Datadog APM
     TELEMETRY_ENABLED: bool = True
-    OTEL_SERVICE_NAME: str = "clestiq-shield-eagle-eye"
-    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://otel-collector:4317"
+    DD_SERVICE: str = "clestiq-shield-eagle-eye"
+    DD_ENV: str = "production"
+    DD_VERSION: str = "1.0.0"
 
     class Config:
         case_sensitive = True
