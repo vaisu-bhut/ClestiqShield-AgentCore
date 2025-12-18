@@ -2,7 +2,8 @@ from typing import Dict, Any, List, Optional
 import time
 import json
 from datetime import datetime
-from langchain_google_vertexai import ChatVertexAI
+
+# from langchain_google_vertexai import ChatVertexAI - Moved to get_llm to avoid import-time auth
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from app.agents.state import AgentState
@@ -90,6 +91,8 @@ _llm = None
 def get_llm():
     global _llm
     if _llm is None:
+        from langchain_google_vertexai import ChatVertexAI
+
         _llm = ChatVertexAI(model_name="gemini-2.0-flash-exp")
     return _llm
 

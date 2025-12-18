@@ -6,7 +6,8 @@ Routes queries to Gemini models via Vertex AI.
 
 import time
 from typing import Dict, Any, Optional
-from langchain_google_vertexai import ChatVertexAI
+
+# from langchain_google_vertexai import ChatVertexAI - Moved to get_llm
 from langchain_core.messages import HumanMessage, SystemMessage
 import httpx
 import structlog
@@ -24,7 +25,7 @@ SUPPORTED_MODELS = {
     "default": "gemini-2.0-flash",
 }
 
-_llm_cache: Dict[str, ChatVertexAI] = {}
+_llm_cache: Dict[str, Any] = {}
 
 
 def get_model_name(requested: str) -> str:
@@ -34,11 +35,13 @@ def get_model_name(requested: str) -> str:
     return SUPPORTED_MODELS.get(requested.lower().strip(), SUPPORTED_MODELS["default"])
 
 
-def get_llm(model_name: str) -> ChatVertexAI:
+def get_llm(model_name: str) -> Any:
     """Get or create LLM instance."""
     global _llm_cache
 
     if model_name not in _llm_cache:
+        from langchain_google_vertexai import ChatVertexAI
+
         settings = get_settings()
         _llm_cache[model_name] = ChatVertexAI(
             model_name=model_name,
