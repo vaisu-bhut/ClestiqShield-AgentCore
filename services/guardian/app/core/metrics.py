@@ -1,27 +1,29 @@
 """
 Guardian Metrics Module.
 
-Tracks output validation, content filtering, and guardrails metrics for Datadog.
+Tracks output validation, content filtering, and guardrail metrics for Datadog.
+NOTE: OpenTelemetry removed - using Datadog APM only. This module provides
+no-op implementations to maintain API compatibility.
 """
 
-from opentelemetry import metrics
 from typing import Optional
 import structlog
 
 logger = structlog.get_logger()
 
-_meter: Optional[metrics.Meter] = None
 
+class NoOpMetric:
+    """No-op metric that does nothing but maintains API compatibility."""
 
-def get_meter() -> metrics.Meter:
-    global _meter
-    if _meter is None:
-        _meter = metrics.get_meter("clestiq.guardian.agent", version="1.0.0")
-    return _meter
+    def add(self, value, attributes=None):
+        pass
+
+    def record(self, value, attributes=None):
+        pass
 
 
 class GuardianMetrics:
-    """Singleton for Guardian-specific metrics."""
+    """Singleton for Guardian-specific metrics (no-op - using Datadog APM instead)."""
 
     _instance = None
     _initialized = False
@@ -35,103 +37,34 @@ class GuardianMetrics:
         if GuardianMetrics._initialized:
             return
 
-        meter = get_meter()
-
-        # Request metrics
-        self.requests_total = meter.create_counter(
-            name="guardian.requests_total",
-            description="Total validation requests",
-            unit="1",
-        )
-
-        self.requests_by_mode = meter.create_counter(
-            name="guardian.requests_by_mode",
-            description="Requests by moderation mode",
-            unit="1",
-        )
-
-        # Content filtering metrics
-        self.content_filtered = meter.create_counter(
-            name="guardian.content_filtered",
-            description="Content filtered by category",
-            unit="1",
-        )
-
-        self.content_by_action = meter.create_counter(
-            name="guardian.content_by_action",
-            description="Content actions (block, warn, allow)",
-            unit="1",
-        )
-
-        # PII leak detection
-        self.pii_leaks_detected = meter.create_counter(
-            name="guardian.pii_leaks_detected",
-            description="PII leaks detected in LLM output",
-            unit="1",
-        )
-
-        # TOON conversion
-        self.toon_conversions = meter.create_counter(
-            name="guardian.toon_conversions",
-            description="TOON to JSON conversions",
-            unit="1",
-        )
-
-        # Latency histograms
-        self.validation_latency = meter.create_histogram(
-            name="guardian.validation_latency_ms",
-            description="Total validation latency",
-            unit="ms",
-        )
-
-        self.content_filter_latency = meter.create_histogram(
-            name="guardian.content_filter_latency_ms",
-            description="Content filtering latency",
-            unit="ms",
-        )
-
-        self.pii_scan_latency = meter.create_histogram(
-            name="guardian.pii_scan_latency_ms",
-            description="PII scanning latency",
-            unit="ms",
-        )
+        # All metrics are no-ops now - Datadog APM provides automatic metrics
+        self.requests_total = NoOpMetric()
+        self.requests_by_mode = NoOpMetric()
+        self.content_filtered = NoOpMetric()
+        self.content_by_action = NoOpMetric()
+        self.pii_leaks_detected = NoOpMetric()
+        self.toon_conversions = NoOpMetric()
+        self.validation_latency = NoOpMetric()
+        self.content_filter_latency = NoOpMetric()
+        self.pii_scan_latency = NoOpMetric()
 
         GuardianMetrics._initialized = True
-        logger.info("Guardian metrics initialized")
+        logger.info("Guardian metrics initialized (no-op - using Datadog APM)")
 
     def record_request(self, moderation_mode: str):
-        self.requests_total.add(1)
-        self.requests_by_mode.add(1, {"mode": moderation_mode})
+        pass  # No-op
 
     def record_content_filtered(self, category: str, action: str):
-        self.content_filtered.add(1, {"category": category})
-        self.content_by_action.add(1, {"action": action})
+        pass  # No-op
 
     def record_pii_leak(self, pii_type: str):
-        self.pii_leaks_detected.add(1, {"pii_type": pii_type})
+        pass  # No-op
 
     def record_toon_conversion(self, success: bool):
-        self.toon_conversions.add(1, {"success": str(success)})
+        pass  # No-op
 
     def record_latency(self, stage: str, latency_ms: float):
-        if stage == "validation":
-            self.validation_latency.record(latency_ms)
-        elif stage == "content_filter":
-            self.content_filter_latency.record(latency_ms)
-        elif stage == "pii_scan":
-            self.pii_scan_latency.record(latency_ms)
-        # NEW: Support for advanced validation stages
-        elif stage in [
-            "hallucination_check",
-            "citation_verification",
-            "tone_check",
-            "disclaimer_injection",
-            "refusal_detection",
-        ]:
-            # Log these under validation_latency for now
-            self.validation_latency.record(latency_ms)
-        else:
-            logger.debug(f"Unknown stage for latency: {stage}")
+        pass  # No-op
 
 
 _guardian_metrics: Optional[GuardianMetrics] = None

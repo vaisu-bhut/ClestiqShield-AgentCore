@@ -1,16 +1,10 @@
 """
 Comprehensive metrics module for Datadog observability.
 
-This module provides custom OpenTelemetry metrics for tracking:
-- Attack prevention (by type)
-- PII redactions (by type)
-- Token usage and savings
-- Request latency by stage
-- Overall security request stats
+NOTE: OpenTelemetry removed - using Datadog APM only. This module provides
+no-op implementations to maintain API compatibility.
 """
 
-from opentelemetry import metrics
-from opentelemetry.metrics import Counter, Histogram, UpDownCounter
 from typing import Dict, Any, Optional
 import structlog
 import time
@@ -19,25 +13,19 @@ from functools import wraps
 
 logger = structlog.get_logger()
 
-# Get the global meter
-_meter: Optional[metrics.Meter] = None
 
+class NoOpMetric:
+    """No-op metric that does nothing but maintains API compatibility."""
 
-def get_meter() -> metrics.Meter:
-    """Get or create the global meter for security metrics."""
-    global _meter
-    if _meter is None:
-        _meter = metrics.get_meter("clestiq.security.agent", version="1.0.0")
-    return _meter
+    def add(self, value, attributes=None):
+        pass
 
-
-# ============================================================================
-# COUNTERS - Aggregate totals
-# ============================================================================
+    def record(self, value, attributes=None):
+        pass
 
 
 class SecurityMetrics:
-    """Singleton class managing all security-related metrics."""
+    """Singleton class managing all security-related metrics (no-op - using Datadog APM)."""
 
     _instance = None
     _initialized = False
@@ -51,173 +39,53 @@ class SecurityMetrics:
         if SecurityMetrics._initialized:
             return
 
-        meter = get_meter()
-
-        # ---- Attack Prevention Metrics ----
-        self.attacks_prevented = meter.create_counter(
-            name="security.attacks_prevented",
-            description="Total number of attacks prevented",
-            unit="1",
-        )
-
-        self.attacks_by_type = meter.create_counter(
-            name="security.attacks_by_type",
-            description="Attacks prevented broken down by attack type",
-            unit="1",
-        )
-
-        # ---- PII Redaction Metrics ----
-        self.pii_redactions = meter.create_counter(
-            name="security.pii_redactions",
-            description="Total PII items redacted",
-            unit="1",
-        )
-
-        self.pii_by_type = meter.create_counter(
-            name="security.pii_by_type",
-            description="PII redactions by type (SSN, CC, EMAIL, PHONE, etc.)",
-            unit="1",
-        )
-
-        # ---- Token Metrics ----
-        self.tokens_saved = meter.create_counter(
-            name="security.tokens_saved",
-            description="Tokens saved by TOON conversion",
-            unit="1",
-        )
-
-        self.llm_tokens_input = meter.create_counter(
-            name="security.llm_tokens_input",
-            description="Input tokens sent to LLM",
-            unit="1",
-        )
-
-        self.llm_tokens_output = meter.create_counter(
-            name="security.llm_tokens_output",
-            description="Output tokens received from LLM",
-            unit="1",
-        )
-
-        self.llm_tokens_total = meter.create_counter(
-            name="security.llm_tokens_total",
-            description="Total tokens used (input + output)",
-            unit="1",
-        )
-
-        # ---- Request Metrics ----
-        self.requests_total = meter.create_counter(
-            name="security.requests_total",
-            description="Total security analysis requests",
-            unit="1",
-        )
-
-        self.requests_blocked = meter.create_counter(
-            name="security.requests_blocked",
-            description="Requests blocked by security checks",
-            unit="1",
-        )
-
-        self.requests_passed = meter.create_counter(
-            name="security.requests_passed",
-            description="Requests that passed security checks",
-            unit="1",
-        )
-
-        # ---- Latency Histograms ----
-        self.request_latency = meter.create_histogram(
-            name="security.request_latency_ms",
-            description="End-to-end request latency in milliseconds",
-            unit="ms",
-        )
-
-        self.sanitization_latency = meter.create_histogram(
-            name="security.sanitization_latency_ms",
-            description="Input sanitization latency in milliseconds",
-            unit="ms",
-        )
-
-        self.pii_detection_latency = meter.create_histogram(
-            name="security.pii_detection_latency_ms",
-            description="PII detection and redaction latency in milliseconds",
-            unit="ms",
-        )
-
-        self.threat_detection_latency = meter.create_histogram(
-            name="security.threat_detection_latency_ms",
-            description="Threat detection latency in milliseconds",
-            unit="ms",
-        )
-
-        self.llm_check_latency = meter.create_histogram(
-            name="security.llm_check_latency_ms",
-            description="LLM security check latency in milliseconds",
-            unit="ms",
-        )
-
-        self.toon_conversion_latency = meter.create_histogram(
-            name="security.toon_conversion_latency_ms",
-            description="TOON conversion latency in milliseconds",
-            unit="ms",
-        )
-
-        self.llm_response_latency = meter.create_histogram(
-            name="security.llm_response_latency_ms",
-            description="LLM response generation latency in milliseconds",
-            unit="ms",
-        )
-
-        # ---- Score Distribution ----
-        self.threat_score_distribution = meter.create_histogram(
-            name="security.threat_score",
-            description="Distribution of threat scores (0.0-1.0)",
-            unit="1",
-        )
-
-        # ---- Active Requests Gauge ----
-        self.active_requests = meter.create_up_down_counter(
-            name="security.active_requests",
-            description="Currently processing requests",
-            unit="1",
-        )
+        # All metrics are no-ops now - Datadog APM provides automatic metrics
+        self.attacks_prevented = NoOpMetric()
+        self.attacks_by_type = NoOpMetric()
+        self.pii_redactions = NoOpMetric()
+        self.pii_by_type = NoOpMetric()
+        self.tokens_saved = NoOpMetric()
+        self.llm_tokens_input = NoOpMetric()
+        self.llm_tokens_output = NoOpMetric()
+        self.llm_tokens_total = NoOpMetric()
+        self.requests_total = NoOpMetric()
+        self.requests_blocked = NoOpMetric()
+        self.requests_passed = NoOpMetric()
+        self.request_latency = NoOpMetric()
+        self.sanitization_latency = NoOpMetric()
+        self.pii_detection_latency = NoOpMetric()
+        self.threat_detection_latency = NoOpMetric()
+        self.llm_check_latency = NoOpMetric()
+        self.toon_conversion_latency = NoOpMetric()
+        self.llm_response_latency = NoOpMetric()
+        self.threat_score_distribution = NoOpMetric()
+        self.active_requests = NoOpMetric()
 
         SecurityMetrics._initialized = True
-        logger.info("Security metrics initialized")
-
-    # ========================================================================
-    # Recording Methods
-    # ========================================================================
+        logger.info("Security metrics initialized (no-op - using Datadog APM)")
 
     def record_attack_prevented(self, attack_type: str, count: int = 1):
-        """Record an attack that was prevented."""
-        self.attacks_prevented.add(count)
-        self.attacks_by_type.add(count, {"attack_type": attack_type})
+        """Record an attack that was prevented (no-op)."""
         logger.info("Attack prevented", attack_type=attack_type, count=count)
 
     def record_pii_redaction(self, pii_type: str, count: int = 1):
-        """Record PII redaction."""
-        self.pii_redactions.add(count)
-        self.pii_by_type.add(count, {"pii_type": pii_type})
+        """Record PII redaction (no-op)."""
         logger.debug("PII redacted", pii_type=pii_type, count=count)
 
     def record_tokens_saved(self, tokens: int, conversion_type: str = "toon"):
-        """Record tokens saved by conversion."""
-        self.tokens_saved.add(tokens, {"conversion_type": conversion_type})
+        """Record tokens saved by conversion (no-op)."""
         logger.debug("Tokens saved", tokens=tokens, conversion_type=conversion_type)
 
     def record_llm_tokens(self, input_tokens: int, output_tokens: int):
-        """Record LLM token usage."""
+        """Record LLM token usage (no-op)."""
         total = input_tokens + output_tokens
-        self.llm_tokens_input.add(input_tokens)
-        self.llm_tokens_output.add(output_tokens)
-        self.llm_tokens_total.add(total)
         logger.info(
             "LLM tokens used", input=input_tokens, output=output_tokens, total=total
         )
 
     def record_request_start(self):
-        """Record a new request starting."""
-        self.requests_total.add(1)
-        self.active_requests.add(1)
+        """Record a new request starting (no-op)."""
+        pass
 
     def record_request_end(
         self,
@@ -226,35 +94,11 @@ class SecurityMetrics:
         threat_score: float = 0.0,
         block_reason: Optional[str] = None,
     ):
-        """
-        Record request completion with detailed tags for Datadog observability.
-
-        Args:
-            blocked: Whether the request was blocked
-            latency_ms: Total processing latency
-            threat_score: Threat confidence score (0.0-1.0)
-            block_reason: Specific reason for blocking (e.g., 'sql_injection', 'xss')
-        """
-        self.active_requests.add(-1)
-
-        # Prepare tags for detailed filtering in Datadog
-        tags = {
-            "security_status": "blocked" if blocked else "passed",
-        }
-
+        """Record request completion (no-op)."""
+        tags = {"security_status": "blocked" if blocked else "passed"}
         if blocked and block_reason:
-            # Normalize block reason to a tag-safe identifier
             normalized_reason = block_reason.lower().replace(" ", "_").replace(":", "")
             tags["block_reason"] = normalized_reason
-
-        # Record metrics with tags
-        self.request_latency.record(latency_ms, tags)
-        self.threat_score_distribution.record(threat_score, tags)
-
-        if blocked:
-            self.requests_blocked.add(1, tags)
-        else:
-            self.requests_passed.add(1, tags)
 
         logger.info(
             "Request completed",
@@ -264,28 +108,8 @@ class SecurityMetrics:
         )
 
     def record_stage_latency(self, stage: str, latency_ms: float):
-        """Record latency for a specific processing stage."""
-        stage_histograms = {
-            "sanitization": self.sanitization_latency,
-            "pii_detection": self.pii_detection_latency,
-            "pii_pseudonymization": self.pii_detection_latency,  # Use same histogram
-            "threat_detection": self.threat_detection_latency,
-            "llm_check": self.llm_check_latency,
-            "toon_conversion": self.toon_conversion_latency,
-            "llm_response": self.llm_response_latency,
-        }
-
-        histogram = stage_histograms.get(stage)
-        if histogram:
-            histogram.record(latency_ms)
-        else:
-            logger.warning("Unknown stage for latency recording", stage=stage)
-
-        histogram = stage_histograms.get(stage)
-        if histogram:
-            histogram.record(latency_ms)
-        else:
-            logger.warning("Unknown stage for latency recording", stage=stage)
+        """Record latency for a specific processing stage (no-op)."""
+        pass
 
 
 # Global metrics instance
@@ -307,7 +131,7 @@ def get_security_metrics() -> SecurityMetrics:
 
 @contextmanager
 def track_latency(stage: str):
-    """Context manager to track latency of a code block."""
+    """Context manager to track latency of a code block (no-op)."""
     metrics = get_security_metrics()
     start_time = time.perf_counter()
     try:
@@ -318,7 +142,7 @@ def track_latency(stage: str):
 
 
 def track_stage(stage: str):
-    """Decorator to track latency of a function."""
+    """Decorator to track latency of a function (no-op)."""
 
     def decorator(func):
         @wraps(func)
@@ -331,7 +155,7 @@ def track_stage(stage: str):
             with track_latency(stage):
                 return func(*args, **kwargs)
 
-        if hasattr(func, "__code__") and func.__code__.co_flags & 0x80:  # CO_COROUTINE
+        if hasattr(func, "__code") and func.__code__.co_flags & 0x80:  # CO_COROUTINE
             return async_wrapper
         return sync_wrapper
 
