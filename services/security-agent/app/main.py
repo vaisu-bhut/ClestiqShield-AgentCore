@@ -33,7 +33,7 @@ from app.core.metrics import get_security_metrics
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": settings.OTEL_SERVICE_NAME}
+    return {"status": "ok", "service": settings.DD_SERVICE}
 
 
 @app.post("/chat", response_model=ChatResponse)

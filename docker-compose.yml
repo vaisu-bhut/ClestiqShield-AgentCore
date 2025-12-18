@@ -10,16 +10,28 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/clestiq_shield
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - OTEL_SERVICE_NAME=clestiq-shield-gateway
+      - DD_ENV=development
+      - DD_SERVICE=clestiq-shield-gateway
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_DOGSTATSD_SOCKET=/var/run/datadog/dsd.socket
+      - DD_LOGS_INJECTION=true
+      - DD_PROFILING_ENABLED=true
+      - DD_RUNTIME_METRICS_ENABLED=true
       - SENTINEL_SERVICE_URL=http://sentinel:8001
       - TELEMETRY_ENABLED=true
     depends_on:
       - db
       - sentinel
-      - otel-collector
+      - datadog-agent
     volumes:
       - ./services/gateway/app:/app/app
+      - dogstatsd-socket:/var/run/datadog
+    labels:
+      com.datadoghq.tags.service: "clestiq-shield-gateway"
+      com.datadoghq.tags.env: "development"
+      com.datadoghq.tags.version: "1.0.0"
     networks:
       - clestiq-network
     healthcheck:
@@ -38,16 +50,28 @@ services:
       - "8003"
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/clestiq_shield
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - OTEL_SERVICE_NAME=clestiq-shield-eagle-eye
+      - DD_ENV=development
+      - DD_SERVICE=clestiq-shield-eagle-eye
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_DOGSTATSD_SOCKET=/var/run/datadog/dsd.socket
+      - DD_LOGS_INJECTION=true
+      - DD_PROFILING_ENABLED=true
+      - DD_RUNTIME_METRICS_ENABLED=true
       - TELEMETRY_ENABLED=true
       - SECRET_KEY=change_this_to_a_strong_secret_key
       - ALGORITHM=HS256
     depends_on:
       - db
-      - otel-collector
+      - datadog-agent
     volumes:
       - ./services/eagle-eye/app:/app/app
+      - dogstatsd-socket:/var/run/datadog
+    labels:
+      com.datadoghq.tags.service: "clestiq-shield-eagle-eye"
+      com.datadoghq.tags.env: "development"
+      com.datadoghq.tags.version: "1.0.0"
     networks:
       - clestiq-network
     healthcheck:
@@ -65,8 +89,15 @@ services:
     expose:
       - "8001"
     environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - OTEL_SERVICE_NAME=clestiq-shield-sentinel
+      - DD_ENV=development
+      - DD_SERVICE=clestiq-shield-sentinel
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_DOGSTATSD_SOCKET=/var/run/datadog/dsd.socket
+      - DD_LOGS_INJECTION=true
+      - DD_PROFILING_ENABLED=true
+      - DD_RUNTIME_METRICS_ENABLED=true
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_LOCATION=${GCP_LOCATION:-us-east1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
@@ -87,11 +118,16 @@ services:
       # Guardian Service URL
       - GUARDIAN_SERVICE_URL=http://guardian:8002
     depends_on:
-      - otel-collector
+      - datadog-agent
       - guardian
     volumes:
       - ./services/security-agent/app:/app/app
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
+      - dogstatsd-socket:/var/run/datadog
+    labels:
+      com.datadoghq.tags.service: "clestiq-shield-sentinel"
+      com.datadoghq.tags.env: "development"
+      com.datadoghq.tags.version: "1.0.0"
     networks:
       - clestiq-network
     healthcheck:
@@ -109,8 +145,15 @@ services:
     expose:
       - "8002"
     environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - OTEL_SERVICE_NAME=clestiq-shield-guardian
+      - DD_ENV=development
+      - DD_SERVICE=clestiq-shield-guardian
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_DOGSTATSD_SOCKET=/var/run/datadog/dsd.socket
+      - DD_LOGS_INJECTION=true
+      - DD_PROFILING_ENABLED=true
+      - DD_RUNTIME_METRICS_ENABLED=true
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_LOCATION=${GCP_LOCATION:-us-east1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
@@ -122,10 +165,15 @@ services:
       - OUTPUT_PII_DETECTION_ENABLED=true
       - AUTO_CONVERT_TOON_TO_JSON=true
     depends_on:
-      - otel-collector
+      - datadog-agent
     volumes:
       - ./services/guardian/app:/app/app
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
+      - dogstatsd-socket:/var/run/datadog
+    labels:
+      com.datadoghq.tags.service: "clestiq-shield-guardian"
+      com.datadoghq.tags.env: "development"
+      com.datadoghq.tags.version: "1.0.0"
     networks:
       - clestiq-network
     healthcheck:
@@ -154,25 +202,56 @@ services:
       timeout: 5s
       retries: 5
 
-  # OpenTelemetry Collector
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.91.0
-    command: ["--config=/etc/otel-collector-config.yaml"]
+  # Datadog Agent
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:latest
     environment:
       - DD_API_KEY=${DD_API_KEY}
       - DD_SITE=${DD_SITE:-datadoghq.com}
-      - DEPLOYMENT_ENV=development
-    volumes:
-      - ./services/otel-collector/config.yaml:/etc/otel-collector-config.yaml:ro
+      - DD_ENV=development
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_LOGS_CONFIG_AUTO_MULTI_LINE_DETECTION=true
+      - DD_CONTAINER_EXCLUDE="name:datadog-agent"
+      - DD_PROFILING_ENABLED=true
+      - DD_RUNTIME_METRICS_ENABLED=true
+      - DD_DOGSTATSD_SOCKET=/var/run/datadog/dsd.socket
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=false
+      # Universal Service Monitoring
+      - DD_SYSTEM_PROBE_ENABLED=true
+      - DD_SYSTEM_PROBE_SERVICE_MONITORING_ENABLED=true
+      # Profiling intake
+      - DD_PROFILING_AGENTLESS=false
+      # Service Monitoring
+      - DD_SERVICE_MONITORING_ENABLED=true
+      - DD_PROCESS_CONFIG_PROCESS_COLLECTION_ENABLED=true
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8888:8888"
-      - "13133:13133"
+      - "8126:8126" # APM traces
+      - "8125:8125/udp" # DogStatsD metrics (fallback)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
+      - dogstatsd-socket:/var/run/datadog
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+      - IPC_LOCK
+      - CHOWN
+    security_opt:
+      - apparmor:unconfined
     networks:
       - clestiq-network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133"]
+      test: ["CMD", "agent", "health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -183,3 +262,4 @@ networks:
 
 volumes:
   postgres_data:
+  dogstatsd-socket:

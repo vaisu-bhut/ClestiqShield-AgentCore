@@ -25,6 +25,20 @@ def setup_logging():
     if not settings.TELEMETRY_ENABLED:
         return
 
+    # Enable Datadog instrumentation
+    from ddtrace import patch_all
+    from ddtrace.runtime import RuntimeMetrics
+    from ddtrace.profiling import Profiler
+
+    patch_all()
+
+    # Enable Continuous Profiler
+    profiler = Profiler()
+    profiler.start()
+
+    # Enable runtime metrics
+    RuntimeMetrics.enable()
+
     # Configure Structlog with Datadog trace context
     structlog.configure(
         processors=[

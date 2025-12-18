@@ -42,6 +42,12 @@ def setup_telemetry(app):
     # This includes FastAPI, httpx, psycopg2, sqlalchemy, etc.
     patch_all()
 
+    # Enable Continuous Profiler for code performance analysis
+    from ddtrace.profiling import Profiler
+
+    profiler = Profiler()
+    profiler.start()
+
     # Enable runtime metrics collection (CPU, memory, etc.)
     RuntimeMetrics.enable()
 

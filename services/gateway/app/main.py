@@ -74,7 +74,7 @@ async def health_check():
     logger.info("Health check requested")
     return {
         "status": "ok",
-        "service": settings.OTEL_SERVICE_NAME,
+        "service": settings.DD_SERVICE,
         "version": settings.VERSION,
     }
 
