@@ -95,7 +95,12 @@ def get_llm():
     global _llm
     if _llm is None:
         logger.info("CRASH_DEBUG: get_llm() - Entering function, _llm is None")
+        logger.info(
+            "CRASH_DEBUG: get_llm() - About to import ChatVertexAI from langchain_google_vertexai"
+        )
         from langchain_google_vertexai import ChatVertexAI
+
+        logger.info("CRASH_DEBUG: get_llm() - ChatVertexAI imported successfully")
 
         settings = get_settings()
 
