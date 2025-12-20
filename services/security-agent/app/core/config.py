@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     SECURITY_XSS_PROTECTION_ENABLED: bool = True
     SECURITY_SQL_INJECTION_DETECTION_ENABLED: bool = True
     SECURITY_COMMAND_INJECTION_DETECTION_ENABLED: bool = True
-    SECURITY_LLM_CHECK_ENABLED: bool = True
+    SECURITY_LLM_CHECK_ENABLED: bool = (
+        False  # Disabled due to langchain_google_vertexai import hang
+    )
     SECURITY_LLM_CHECK_THRESHOLD: float = 0.85
 
     # TOON Conversion Settings
