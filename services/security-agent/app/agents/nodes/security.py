@@ -93,7 +93,8 @@ def get_llm():
     if _llm is None:
         from langchain_google_vertexai import ChatVertexAI
 
-        _llm = ChatVertexAI(model_name="gemini-2.0-flash-exp")
+        settings = get_settings()
+        _llm = ChatVertexAI(model_name=settings.LLM_MODEL_NAME)
     return _llm
 
 
@@ -197,6 +198,7 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
                 )
 
         # Step 3: Threat Detection
+        logger.info("Starting Threat Detection...")
         stage_start = time.perf_counter()
         threats = []
 
@@ -224,6 +226,7 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
             threats.append(path_threat)
 
         stage_latency = (time.perf_counter() - stage_start) * 1000
+        logger.info(f"Threat Detection completed in {stage_latency:.2f}ms")
         metrics.record_stage_latency("threat_detection", stage_latency)
         metrics_builder.add_latency("threat_detection", stage_latency)
 
@@ -266,6 +269,7 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
                 }
 
         # Step 4: LLM-based Security Analysis
+        logger.info("Starting LLM Security Check...")
         stage_start = time.perf_counter()
         prompt = ChatPromptTemplate.from_template(SECURITY_PROMPT)
         chain = prompt | get_llm() | JsonOutputParser()
@@ -275,6 +279,7 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
         )
 
         stage_latency = (time.perf_counter() - stage_start) * 1000
+        logger.info(f"LLM Security Check completed in {stage_latency:.2f}ms")
         metrics.record_stage_latency("llm_check", stage_latency)
         metrics_builder.add_latency("llm_check", stage_latency)
 

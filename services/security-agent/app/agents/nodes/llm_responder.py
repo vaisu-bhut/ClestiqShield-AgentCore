@@ -19,10 +19,8 @@ logger = structlog.get_logger()
 
 # Gemini Models Only (for now)
 SUPPORTED_MODELS = {
-    "gemini-2.0-flash": "gemini-2.0-flash",
-    "gemini-2.0": "gemini-2.0-flash",
-    "gemini": "gemini-2.0-flash",
-    "default": "gemini-2.0-flash",
+    "gemini-2.5-flash": "gemini-2.5-flash",
+    "default": "gemini-2.5-flash",
 }
 
 _llm_cache: Dict[str, Any] = {}
@@ -30,9 +28,21 @@ _llm_cache: Dict[str, Any] = {}
 
 def get_model_name(requested: str) -> str:
     """Get the Vertex AI model name."""
+    settings = get_settings()
+    default_model = settings.LLM_MODEL_NAME
+
     if not requested:
-        return SUPPORTED_MODELS["default"]
-    return SUPPORTED_MODELS.get(requested.lower().strip(), SUPPORTED_MODELS["default"])
+        return default_model
+
+    # Check if exact match in supported models
+    if requested in SUPPORTED_MODELS:
+        return SUPPORTED_MODELS[requested]
+
+    # Check if exact match in supported models values
+    if requested in SUPPORTED_MODELS.values():
+        return requested
+
+    return SUPPORTED_MODELS.get(requested.lower().strip(), default_model)
 
 
 def get_llm(model_name: str) -> Any:
