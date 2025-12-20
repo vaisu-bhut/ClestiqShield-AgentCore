@@ -89,12 +89,20 @@ _llm = None
 
 
 def get_llm():
+    """Get or create the LLM instance (singleton pattern)."""
     global _llm
     if _llm is None:
         from langchain_google_vertexai import ChatVertexAI
 
         settings = get_settings()
+
+        logger.info(
+            f"CRASH_DEBUG: get_llm() - About to create ChatVertexAI with model={settings.LLM_MODEL_NAME}"
+        )
         _llm = ChatVertexAI(model_name=settings.LLM_MODEL_NAME)
+        logger.info("CRASH_DEBUG: get_llm() - ChatVertexAI created successfully")
+    else:
+        logger.info("CRASH_DEBUG: get_llm() - Returning cached LLM instance")
     return _llm
 
 
