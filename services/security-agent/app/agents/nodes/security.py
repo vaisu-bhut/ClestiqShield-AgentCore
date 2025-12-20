@@ -275,11 +275,30 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
 
             # Reconstruct the chain manually as before
             try:
+                logger.info("CRASH_DEBUG: About to import ChatPromptTemplate")
                 from langchain_core.prompts import ChatPromptTemplate
+
+                logger.info("CRASH_DEBUG: ChatPromptTemplate imported successfully")
+
+                logger.info("CRASH_DEBUG: About to import JsonOutputParser")
                 from langchain_core.output_parsers import JsonOutputParser
 
+                logger.info("CRASH_DEBUG: JsonOutputParser imported successfully")
+
+                logger.info("CRASH_DEBUG: About to create prompt template")
                 prompt = ChatPromptTemplate.from_template(SECURITY_PROMPT)
-                chain = prompt | get_llm() | JsonOutputParser()
+                logger.info("CRASH_DEBUG: Prompt template created successfully")
+
+                logger.info("CRASH_DEBUG: About to call get_llm()")
+                llm = get_llm()
+                logger.info("CRASH_DEBUG: get_llm() returned successfully")
+
+                logger.info("CRASH_DEBUG: About to create output parser")
+                parser = JsonOutputParser()
+                logger.info("CRASH_DEBUG: Output parser created successfully")
+
+                logger.info("CRASH_DEBUG: About to create chain with pipe operator")
+                chain = prompt | llm | parser
                 logger.info("CRASH_DEBUG: LLM chain initialized successfully")
             except Exception as e:
                 logger.error(f"CRASH_DEBUG: Failed to initialize LLM chain: {e}")
