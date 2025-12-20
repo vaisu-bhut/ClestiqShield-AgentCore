@@ -268,20 +268,55 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
                     "metrics_data": metrics_builder.build(),
                 }
 
-        # Step 4: LLM-based Security Analysis
-        logger.info("Starting LLM Security Check...")
-        stage_start = time.perf_counter()
-        prompt = ChatPromptTemplate.from_template(SECURITY_PROMPT)
-        chain = prompt | get_llm() | JsonOutputParser()
+        # Step 4: LLM Security Analysis (if enabled)
+        llm_result = {}
+        if settings.SECURITY_LLM_CHECK_ENABLED:
+            logger.info("CRASH_DEBUG: Starting LLM Security Check setup")
 
-        llm_result = await chain.ainvoke(
-            {"input": user_input, "threshold": settings.SECURITY_LLM_CHECK_THRESHOLD}
-        )
+            # Reconstruct the chain manually as before
+            try:
+                from langchain_core.prompts import ChatPromptTemplate
+                from langchain_core.output_parsers import JsonOutputParser
 
-        stage_latency = (time.perf_counter() - stage_start) * 1000
-        logger.info(f"LLM Security Check completed in {stage_latency:.2f}ms")
-        metrics.record_stage_latency("llm_check", stage_latency)
-        metrics_builder.add_latency("llm_check", stage_latency)
+                prompt = ChatPromptTemplate.from_template(SECURITY_PROMPT)
+                chain = prompt | get_llm() | JsonOutputParser()
+                logger.info("CRASH_DEBUG: LLM chain initialized successfully")
+            except Exception as e:
+                logger.error(f"CRASH_DEBUG: Failed to initialize LLM chain: {e}")
+                raise
+
+            logger.info(
+                "CRASH_DEBUG: Preparing LLM input",
+                input_length=len(user_input),
+                threshold=settings.SECURITY_LLM_CHECK_THRESHOLD,
+            )
+
+            # Using current time for detailed timing
+            llm_start = time.perf_counter()
+            logger.info(f"CRASH_DEBUG: Invoking LLM chain... (Time: {llm_start})")
+
+            try:
+                # Add a timeout to the LLM call if possible or just log around it
+                llm_result = await chain.ainvoke(
+                    {
+                        "input": user_input,
+                        "threshold": settings.SECURITY_LLM_CHECK_THRESHOLD,
+                    }
+                )
+                logger.info("CRASH_DEBUG: LLM chain returned successfully")
+            except Exception as llm_exc:
+                logger.error(f"CRASH_DEBUG: LLM chain raised exception: {llm_exc}")
+                # Depending on policy, you might want to block here or set a default score
+                # For now, re-raise to be caught by the outer try/except
+                raise
+
+            check_time_ms = (time.perf_counter() - llm_start) * 1000
+
+            logger.info(
+                f"CRASH_DEBUG: LLM Security Check completed in {check_time_ms:.2f}ms"
+            )
+            metrics.record_stage_latency("llm_check", check_time_ms)
+            metrics_builder.add_latency("llm_check", check_time_ms)
 
         score = llm_result.get("security_score", 0.0)
         is_blocked = llm_result.get("is_blocked", False)

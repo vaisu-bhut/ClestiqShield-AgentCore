@@ -125,8 +125,6 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     logger.info("LLM request", model=model_name)
 
-    start_time = time.perf_counter()
-
     try:
         llm = get_llm(model_name)
 
@@ -135,11 +133,24 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
             HumanMessage(content=query),
         ]
 
-        response = await llm.ainvoke(messages)
-        llm_latency = (time.perf_counter() - start_time) * 1000
+        # Using current time for detailed timing and crash storage
+        logger.info(f"CRASH_DEBUG: LLM Responder invoking model {model_name}...")
+        llm_start = time.perf_counter()
+
+        try:
+            response = await llm.ainvoke(messages)
+            logger.info("CRASH_DEBUG: LLM Responder invocation successful")
+        except Exception as e:
+            logger.error(f"CRASH_DEBUG: LLM Responder failed during invocation: {e}")
+            raise
+
+        llm_latency = (time.perf_counter() - llm_start) * 1000
 
         response_text = (
             response.content if hasattr(response, "content") else str(response)
+        )
+        logger.info(
+            f"CRASH_DEBUG: LLM Responder received response (Length: {len(response_text)})"
         )
 
         # Token usage
@@ -163,13 +174,19 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
         guardrails = input_data.get("guardrails", {})
         original_query = input_data.get("prompt", "")
 
-        guardian_result = await call_guardian(
-            response_text,
-            moderation,
-            output_format,
-            guardrails=guardrails,
-            original_query=original_query,
-        )
+        logger.info("CRASH_DEBUG: Calling Guardian for validation...")
+        try:
+            guardian_result = await call_guardian(
+                response_text,
+                moderation,
+                output_format,
+                guardrails=guardrails,
+                original_query=original_query,
+            )
+            logger.info("CRASH_DEBUG: Guardian call completed")
+        except Exception as e:
+            logger.error(f"CRASH_DEBUG: Guardian call threw unexpected exception: {e}")
+            raise
 
         # DEBUG: Log what Guardian returned
         logger.info(
