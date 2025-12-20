@@ -90,17 +90,30 @@ _llm = None
 
 def get_llm():
     """Get or create the LLM instance (singleton pattern)."""
+    import asyncio
+
     global _llm
     if _llm is None:
+        logger.info("CRASH_DEBUG: get_llm() - Entering function, _llm is None")
         from langchain_google_vertexai import ChatVertexAI
 
         settings = get_settings()
 
         logger.info(
-            f"CRASH_DEBUG: get_llm() - About to create ChatVertexAI with model={settings.LLM_MODEL_NAME}"
+            f"CRASH_DEBUG: get_llm() - About to create ChatVertexAI with model={settings.LLM_MODEL_NAME}, project={settings.GCP_PROJECT_ID}"
         )
-        _llm = ChatVertexAI(model_name=settings.LLM_MODEL_NAME)
-        logger.info("CRASH_DEBUG: get_llm() - ChatVertexAI created successfully")
+
+        try:
+            # Create with explicit project and location to avoid metadata API calls
+            _llm = ChatVertexAI(
+                model_name=settings.LLM_MODEL_NAME,
+                project=settings.GCP_PROJECT_ID,
+                location=settings.GCP_LOCATION,
+            )
+            logger.info("CRASH_DEBUG: get_llm() - ChatVertexAI created successfully")
+        except Exception as e:
+            logger.error(f"CRASH_DEBUG: get_llm() - ChatVertexAI creation failed: {e}")
+            raise
     else:
         logger.info("CRASH_DEBUG: get_llm() - Returning cached LLM instance")
     return _llm
