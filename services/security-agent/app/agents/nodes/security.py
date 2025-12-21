@@ -276,48 +276,22 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
         # Step 4: LLM Security Analysis (if enabled)
         llm_result = {}
         if settings.SECURITY_LLM_CHECK_ENABLED:
-            logger.info("CRASH_DEBUG: Starting LLM Security Check setup")
-
             # Reconstruct the chain manually as before
             try:
-                logger.info("CRASH_DEBUG: About to import ChatPromptTemplate")
                 from langchain_core.prompts import ChatPromptTemplate
-
-                logger.info("CRASH_DEBUG: ChatPromptTemplate imported successfully")
-
-                logger.info("CRASH_DEBUG: About to import JsonOutputParser")
                 from langchain_core.output_parsers import JsonOutputParser
 
-                logger.info("CRASH_DEBUG: JsonOutputParser imported successfully")
-
-                logger.info("CRASH_DEBUG: About to create prompt template")
                 prompt = ChatPromptTemplate.from_template(SECURITY_PROMPT)
-                logger.info("CRASH_DEBUG: Prompt template created successfully")
-
-                logger.info("CRASH_DEBUG: About to call get_llm()")
                 llm = get_llm()
-                logger.info("CRASH_DEBUG: get_llm() returned successfully")
-
-                logger.info("CRASH_DEBUG: About to create output parser")
                 parser = JsonOutputParser()
-                logger.info("CRASH_DEBUG: Output parser created successfully")
 
-                logger.info("CRASH_DEBUG: About to create chain with pipe operator")
                 chain = prompt | llm | parser
-                logger.info("CRASH_DEBUG: LLM chain initialized successfully")
             except Exception as e:
-                logger.error(f"CRASH_DEBUG: Failed to initialize LLM chain: {e}")
+                logger.error(f"Failed to initialize LLM chain: {e}")
                 raise
-
-            logger.info(
-                "CRASH_DEBUG: Preparing LLM input",
-                input_length=len(user_input),
-                threshold=settings.SECURITY_LLM_CHECK_THRESHOLD,
-            )
 
             # Using current time for detailed timing
             llm_start = time.perf_counter()
-            logger.info(f"CRASH_DEBUG: Invoking LLM chain... (Time: {llm_start})")
 
             try:
                 # Add a timeout to the LLM call if possible or just log around it
@@ -327,18 +301,13 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
                         "threshold": settings.SECURITY_LLM_CHECK_THRESHOLD,
                     }
                 )
-                logger.info("CRASH_DEBUG: LLM chain returned successfully")
             except Exception as llm_exc:
-                logger.error(f"CRASH_DEBUG: LLM chain raised exception: {llm_exc}")
+                logger.error(f"LLM chain raised exception: {llm_exc}")
                 # Depending on policy, you might want to block here or set a default score
                 # For now, re-raise to be caught by the outer try/except
                 raise
 
             check_time_ms = (time.perf_counter() - llm_start) * 1000
-
-            logger.info(
-                f"CRASH_DEBUG: LLM Security Check completed in {check_time_ms:.2f}ms"
-            )
             metrics.record_stage_latency("llm_check", check_time_ms)
             metrics_builder.add_latency("llm_check", check_time_ms)
 
