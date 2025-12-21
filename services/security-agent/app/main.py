@@ -18,34 +18,25 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)
 
-print("DEBUG: Setting up telemetry...", flush=True)
 # Setup telemetry IMMEDIATELY
 setup_telemetry(app)
-print("DEBUG: Telemetry setup complete", flush=True)
 
 # Initialize global logger after telemetry
-print("DEBUG: Initializing structlog...", flush=True)
+# Initialize global logger after telemetry
 logger = structlog.get_logger()
-print("DEBUG: Structlog initialized", flush=True)
 
 # Import modules AFTER logging is configured
-print("DEBUG: Importing app.agents.graph...", flush=True)
+# Import modules AFTER logging is configured
 try:
     from app.agents.graph import agent_graph
-
-    print("DEBUG: Imported app.agents.graph successfully", flush=True)
 except Exception as e:
-    print(f"DEBUG: Failed to import app.agents.graph: {e}", flush=True)
     import traceback
 
     traceback.print_exc()
     raise
 
-print("DEBUG: Importing schemas and metrics...", flush=True)
 from app.schemas.security import ChatRequest, ChatResponse
 from app.core.metrics import get_security_metrics
-
-print("DEBUG: Imports completed successfully", flush=True)
 
 
 @app.get("/health")
@@ -65,7 +56,8 @@ async def chat(request: ChatRequest):
     """
     import time
 
-    print(f"CRASH_DEBUG: Chat request endpoint entered at {time.time()}", flush=True)
+    import time
+
     logger.info(
         "Chat request received",
         client_ip=request.client_ip,
@@ -83,12 +75,10 @@ async def chat(request: ChatRequest):
         "metrics_data": None,
     }
 
-    print("CRASH_DEBUG: Invoking agent graph...", flush=True)
     try:
         result = await agent_graph.ainvoke(initial_state)
-        print("CRASH_DEBUG: Agent graph returned successfully", flush=True)
     except Exception as e:
-        print(f"CRASH_DEBUG: Agent graph failed: {e}", flush=True)
+        logger.error(f"Agent graph execution failed: {e}")
         raise
 
     if result.get("is_blocked"):
