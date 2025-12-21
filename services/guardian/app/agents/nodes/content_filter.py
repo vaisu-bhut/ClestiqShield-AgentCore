@@ -9,7 +9,7 @@ import re
 import time
 from typing import Dict, Any
 
-# from langchain_google_vertexai import ChatVertexAI - Moved to get_content_llm
+# from langchain_google_genai import ChatGoogleGenerativeAI - Moved to get_content_llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 import structlog
@@ -52,9 +52,14 @@ _content_llm = None
 def get_content_llm():
     global _content_llm
     if _content_llm is None:
-        from langchain_google_vertexai import ChatVertexAI
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
-        _content_llm = ChatVertexAI(model_name="gemini-2.0-flash-exp", temperature=0)
+        settings = get_settings()
+        _content_llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash-exp",
+            google_api_key=settings.GEMINI_API_KEY,
+            temperature=0,
+        )
     return _content_llm
 
 

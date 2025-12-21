@@ -1,13 +1,13 @@
 """
 LLM Responder Node.
 
-Routes queries to Gemini models via Vertex AI.
+Routes queries to Gemini models via Gemini AI Studio.
 """
 
 import time
 from typing import Dict, Any, Optional
 
-# from langchain_google_vertexai import ChatVertexAI - Moved to get_llm
+# from langchain_google_genai import ChatGoogleGenerativeAI - Moved to get_llm
 from langchain_core.messages import HumanMessage, SystemMessage
 import httpx
 import structlog
@@ -27,7 +27,7 @@ _llm_cache: Dict[str, Any] = {}
 
 
 def get_model_name(requested: str) -> str:
-    """Get the Vertex AI model name."""
+    """Get the Gemini AI model name."""
     settings = get_settings()
     default_model = settings.LLM_MODEL_NAME
 
@@ -50,14 +50,13 @@ def get_llm(model_name: str) -> Any:
     global _llm_cache
 
     if model_name not in _llm_cache:
-        from langchain_google_vertexai import ChatVertexAI
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
         settings = get_settings()
-        _llm_cache[model_name] = ChatVertexAI(
-            model_name=model_name,
+        _llm_cache[model_name] = ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=settings.GEMINI_API_KEY,
             max_tokens=settings.LLM_MAX_TOKENS,
-            project=settings.GCP_PROJECT_ID,
-            location=settings.GCP_LOCATION,
         )
         logger.info("Created LLM", model=model_name)
 
@@ -133,24 +132,12 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
             HumanMessage(content=query),
         ]
 
-        # Using current time for detailed timing and crash storage
-        logger.info(f"CRASH_DEBUG: LLM Responder invoking model {model_name}...")
         llm_start = time.perf_counter()
-
-        try:
-            response = await llm.ainvoke(messages)
-            logger.info("CRASH_DEBUG: LLM Responder invocation successful")
-        except Exception as e:
-            logger.error(f"CRASH_DEBUG: LLM Responder failed during invocation: {e}")
-            raise
-
+        response = await llm.ainvoke(messages)
         llm_latency = (time.perf_counter() - llm_start) * 1000
 
         response_text = (
             response.content if hasattr(response, "content") else str(response)
-        )
-        logger.info(
-            f"CRASH_DEBUG: LLM Responder received response (Length: {len(response_text)})"
         )
 
         # Token usage
@@ -174,19 +161,13 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
         guardrails = input_data.get("guardrails", {})
         original_query = input_data.get("prompt", "")
 
-        logger.info("CRASH_DEBUG: Calling Guardian for validation...")
-        try:
-            guardian_result = await call_guardian(
-                response_text,
-                moderation,
-                output_format,
-                guardrails=guardrails,
-                original_query=original_query,
-            )
-            logger.info("CRASH_DEBUG: Guardian call completed")
-        except Exception as e:
-            logger.error(f"CRASH_DEBUG: Guardian call threw unexpected exception: {e}")
-            raise
+        guardian_result = await call_guardian(
+            response_text,
+            moderation,
+            output_format,
+            guardrails=guardrails,
+            original_query=original_query,
+        )
 
         # DEBUG: Log what Guardian returned
         logger.info(

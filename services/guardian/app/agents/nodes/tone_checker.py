@@ -8,7 +8,7 @@ Verifies that LLM responses match the user-defined brand tone
 import time
 from typing import Dict, Any
 
-# from langchain_google_vertexai import ChatVertexAI - Moved to get_tone_llm
+# from langchain_google_genai import ChatGoogleGenerativeAI - Moved to get_tone_llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 import structlog
@@ -23,9 +23,16 @@ _tone_llm = None
 def get_tone_llm():
     global _tone_llm
     if _tone_llm is None:
-        from langchain_google_vertexai import ChatVertexAI
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
-        _tone_llm = ChatVertexAI(model_name="gemini-2.0-flash-exp", temperature=0)
+        from app.core.config import get_settings
+
+        settings = get_settings()
+        _tone_llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash-exp",
+            google_api_key=settings.GEMINI_API_KEY,
+            temperature=0,
+        )
     return _tone_llm
 
 
