@@ -12,10 +12,8 @@ class Settings(BaseSettings):
     DD_ENV: str = "production"
     DD_VERSION: str = "1.0.0"
 
-    # Google Cloud / Vertex AI
-    GCP_PROJECT_ID: str
-    GCP_LOCATION: str = "us-east1"
-    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+    # Gemini AI Studio
+    GEMINI_API_KEY: str
 
     # Security Settings
     SECURITY_SANITIZATION_ENABLED: bool = True
@@ -23,9 +21,7 @@ class Settings(BaseSettings):
     SECURITY_XSS_PROTECTION_ENABLED: bool = True
     SECURITY_SQL_INJECTION_DETECTION_ENABLED: bool = True
     SECURITY_COMMAND_INJECTION_DETECTION_ENABLED: bool = True
-    SECURITY_LLM_CHECK_ENABLED: bool = (
-        False  # Disabled due to langchain_google_vertexai import hang
-    )
+    SECURITY_LLM_CHECK_ENABLED: bool = True
     SECURITY_LLM_CHECK_THRESHOLD: float = 0.85
 
     # TOON Conversion Settings

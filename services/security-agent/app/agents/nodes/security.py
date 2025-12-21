@@ -3,7 +3,7 @@ import time
 import json
 from datetime import datetime
 
-# from langchain_google_vertexai import ChatVertexAI - Moved to get_llm to avoid import-time auth
+# from langchain_google_genai import ChatGoogleGenerativeAI - Moved to get_llm to avoid import-time issues
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from app.agents.state import AgentState
@@ -84,43 +84,22 @@ Analyze the input and provide JSON:
 Output ONLY JSON.
 """
 
-# Initialize LLM lazily to avoid import-time auth errors
+# Initialize LLM lazily to avoid import-time issues
 _llm = None
 
 
 def get_llm():
     """Get or create the LLM instance (singleton pattern)."""
-    import asyncio
-
     global _llm
     if _llm is None:
-        logger.info("CRASH_DEBUG: get_llm() - Entering function, _llm is None")
-        logger.info(
-            "CRASH_DEBUG: get_llm() - About to import ChatVertexAI from langchain_google_vertexai"
-        )
-        from langchain_google_vertexai import ChatVertexAI
-
-        logger.info("CRASH_DEBUG: get_llm() - ChatVertexAI imported successfully")
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
         settings = get_settings()
-
-        logger.info(
-            f"CRASH_DEBUG: get_llm() - About to create ChatVertexAI with model={settings.LLM_MODEL_NAME}, project={settings.GCP_PROJECT_ID}"
+        _llm = ChatGoogleGenerativeAI(
+            model=settings.LLM_MODEL_NAME,
+            google_api_key=settings.GEMINI_API_KEY,
         )
-
-        try:
-            # Create with explicit project and location to avoid metadata API calls
-            _llm = ChatVertexAI(
-                model_name=settings.LLM_MODEL_NAME,
-                project=settings.GCP_PROJECT_ID,
-                location=settings.GCP_LOCATION,
-            )
-            logger.info("CRASH_DEBUG: get_llm() - ChatVertexAI created successfully")
-        except Exception as e:
-            logger.error(f"CRASH_DEBUG: get_llm() - ChatVertexAI creation failed: {e}")
-            raise
-    else:
-        logger.info("CRASH_DEBUG: get_llm() - Returning cached LLM instance")
+        logger.info("LLM initialized", model=settings.LLM_MODEL_NAME)
     return _llm
 
 

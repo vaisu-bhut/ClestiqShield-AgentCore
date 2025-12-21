@@ -12,10 +12,8 @@ class Settings(BaseSettings):
     DD_ENV: str = "production"
     DD_VERSION: str = "1.0.0"
 
-    # Google Cloud / Vertex AI
-    GCP_PROJECT_ID: str
-    GCP_LOCATION: str = "us-east1"
-    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+    # Gemini AI Studio
+    GEMINI_API_KEY: str
 
     # Moderation Settings
     DEFAULT_MODERATION_MODE: str = "moderate"  # strict, moderate, relaxed, raw
