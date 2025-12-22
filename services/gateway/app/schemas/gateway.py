@@ -66,7 +66,7 @@ class GatewayRequest(BaseModel):
     query: str = Field(..., description="User query/prompt to process")
     model: str = Field(
         default="gemini-3-flash-preview",
-        description="LLM model to use (gemini-3-flash-preview, gemini-2.0-flash, etc.)",
+        description="LLM model to use (gemini-3-flash-preview, etc.)",
     )
     moderation: str = Field(
         default="moderate",
