@@ -43,9 +43,10 @@ async def get_user(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(User).where(User.id == current_user_id))
-    if not result.scalars().first():
+    user = result.scalars().first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return result.scalars().first()
+    return user
 
 
 @router.delete("/account-closure", status_code=status.HTTP_204_NO_CONTENT)

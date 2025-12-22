@@ -36,7 +36,7 @@ async def proxy_request(
 
     Request Body:
         - query: User query/prompt to process
-        - model: LLM model to use (default: gemini-2.0-flash)
+        - model: LLM model to use (default: gemini-3-flash-preview)
         - moderation: Content moderation level (strict, moderate, relaxed, raw)
         - output_format: Output format (json or toon)
         - guardrails: Optional guardrails configuration

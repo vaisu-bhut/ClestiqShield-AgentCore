@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     LLM_FORWARD_ENABLED: bool = True
-    LLM_MODEL_NAME: str = "gemini-2.0-flash-exp"
+    LLM_MODEL_NAME: str = "gemini-3-flash-preview"
     LLM_MAX_TOKENS: int = 8192
 
     # Guardian Service (Output Validation)

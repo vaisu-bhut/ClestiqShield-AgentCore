@@ -52,7 +52,7 @@ class GatewayRequest(BaseModel):
     Example:
         {
             "query": "What is machine learning?",
-            "model": "gemini-2.0-flash",
+            "model": "gemini-3-flash-preview",
             "moderation": "moderate",
             "output_format": "json",
             "guardrails": {
@@ -65,8 +65,8 @@ class GatewayRequest(BaseModel):
 
     query: str = Field(..., description="User query/prompt to process")
     model: str = Field(
-        default="gemini-2.0-flash",
-        description="LLM model to use (gemini-2.0-flash, gemini-2.0, etc.)",
+        default="gemini-3-flash-preview",
+        description="LLM model to use (gemini-3-flash-preview, etc.)",
     )
     moderation: str = Field(
         default="moderate",
@@ -150,7 +150,7 @@ class GatewayResponse(BaseModel):
                     "output_tokens": 150,
                     "total_tokens": 165
                 },
-                "model_used": "gemini-2.0-flash",
+                "model_used": "gemini-3-flash-preview",
                 "threats_detected": 0,
                 "pii_redacted": 0
             }
