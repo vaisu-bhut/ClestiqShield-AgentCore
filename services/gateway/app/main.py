@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import structlog
 
 from app.core.config import get_settings
-from app.core.telemetry import setup_telemetry
+
 
 settings = get_settings()
 from app.core.db import engine, Base
@@ -36,8 +36,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Setup telemetry IMMEDIATELY
-setup_telemetry(app)
 
 # Initialize global logger AFTER telemetry setup
 logger = structlog.get_logger()
@@ -45,8 +43,6 @@ logger = structlog.get_logger()
 # Import endpoints AFTER logging is configured
 from app.api.v1.endpoints import chat, router_eagleeye
 
-# Setup telemetry after app creation but before startup
-setup_telemetry(app)
 
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
 

@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     DD_SERVICE: str = "clestiq-shield-gateway"
     DD_ENV: str = "production"
     DD_VERSION: str = "1.0.0"
+    DD_AGENT_HOST: str = "localhost"
+    DD_DOGSTATSD_PORT: int = 8125
+    DD_DOGSTATSD_SOCKET: str = ""
 
     # Sentinel Service (Input Security)
     SENTINEL_SERVICE_URL: str = "http://sentinel:8001"

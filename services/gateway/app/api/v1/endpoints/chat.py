@@ -15,6 +15,7 @@ from app.schemas.gateway import (
     ResponseMetrics,
     TokenUsage,
 )
+from app.core.telemetry import telemetry
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -144,6 +145,17 @@ async def chat_request(
 
     # Check if blocked
     if is_blocked:
+        # Record blocked metric
+        telemetry.increment(
+            "clestiq.gateway.requests",
+            tags=[
+                f"app:{current_app.name}",
+                f"model:{body.model}",
+                "status:blocked",
+                f"reason:{block_reason}",
+            ],
+        )
+
         logger.warning(
             "Request blocked by Sentinel",
             app_name=current_app.name,
@@ -157,6 +169,12 @@ async def chat_request(
             },
             headers=security_headers,
         )
+
+    # Record success metric
+    telemetry.increment(
+        "clestiq.gateway.requests",
+        tags=[f"app:{current_app.name}", f"model:{body.model}", "status:passed"],
+    )
 
     logger.info("Request passed Sentinel check")
 
@@ -220,6 +238,75 @@ async def chat_request(
     api_key.usage_data = current_usage
 
     await db.commit()
+
+    # --- DATADOG METRICS EXPORT ---
+    # 1. Processing Time
+    telemetry.histogram(
+        "clestiq.gateway.latency",
+        processing_time_ms,
+        tags=[f"app:{current_app.name}", f"model:{model_used}"],
+    )
+
+    # 2. Security Score
+    telemetry.gauge(
+        "clestiq.gateway.security_score",
+        security_score,
+        tags=[f"app:{current_app.name}"],
+    )
+
+    # 3. Token Usage
+    if response_metrics.token_usage:
+        telemetry.increment(
+            "clestiq.gateway.tokens",
+            response_metrics.token_usage.input_tokens,
+            tags=[f"app:{current_app.name}", f"model:{model_used}", "type:input"],
+        )
+        telemetry.increment(
+            "clestiq.gateway.tokens",
+            response_metrics.token_usage.output_tokens,
+            tags=[f"app:{current_app.name}", f"model:{model_used}", "type:output"],
+        )
+        telemetry.increment(
+            "clestiq.gateway.tokens",
+            response_metrics.token_usage.total_tokens,
+            tags=[f"app:{current_app.name}", f"model:{model_used}", "type:total"],
+        )
+
+    # 4. Tokens Saved (Efficiency)
+    if response_metrics.tokens_saved > 0:
+        telemetry.increment(
+            "clestiq.gateway.tokens_saved",
+            response_metrics.tokens_saved,
+            tags=[f"app:{current_app.name}", f"model:{model_used}"],
+        )
+
+    # 5. Guardian Metrics (Reliability & Brand Safety)
+    if response_metrics.hallucination_detected:
+        telemetry.increment(
+            "clestiq.guardian.hallucination",
+            tags=[f"app:{current_app.name}", f"model:{model_used}"],
+        )
+
+    if response_metrics.threats_detected > 0:
+        telemetry.increment(
+            "clestiq.gateway.threats",
+            response_metrics.threats_detected,
+            tags=[f"app:{current_app.name}", f"model:{model_used}"],
+        )
+
+    if response_metrics.toxicity_score is not None:
+        telemetry.gauge(
+            "clestiq.guardian.toxicity",
+            response_metrics.toxicity_score,
+            tags=[f"app:{current_app.name}"],
+        )
+
+    if response_metrics.pii_redacted > 0:
+        telemetry.increment(
+            "clestiq.gateway.pii_redacted",
+            response_metrics.pii_redacted,
+            tags=[f"app:{current_app.name}"],
+        )
 
     # Return the enhanced response
     return GatewayResponse(
