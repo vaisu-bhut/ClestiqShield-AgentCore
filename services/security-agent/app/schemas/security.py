@@ -2,6 +2,41 @@ from pydantic import BaseModel
 from typing import Any, Dict, Optional
 
 
+class SecuritySettings(BaseModel):
+    """Unified security and validation settings."""
+
+    # Privacy
+    pii_masking: bool = False  # Enables both input redaction and output scanning
+
+    # Input Security
+    sanitize_input: bool = False
+    detect_threats: bool = False  # Enables SQL, XSS, and Command injection detection
+
+    # Output Validation
+    content_filter: bool = False  # Toxicity and harmful content check
+    hallucination_check: bool = False
+    citation_check: bool = False
+    tone_check: bool = False
+
+    # Advanced / Misc
+    toon_mode: bool = False  # Enables TOON conversion (in/out)
+    enable_llm_forward: bool = False  # Should this be here? Yes.
+
+
+class ChatRequest(BaseModel):
+    """Simplified request schema."""
+
+    query: str
+    model: str = "gemini-3-flash-preview"
+    moderation: str = "moderate"
+    output_format: str = "json"
+    max_output_tokens: Optional[int] = None
+    settings: SecuritySettings = SecuritySettings()
+
+    client_ip: Optional[str] = None
+    user_agent: Optional[str] = None
+
+
 class SentinelConfig(BaseModel):
     """Configuration for Sentinel (Input Security) features."""
 
@@ -49,18 +84,6 @@ class SecurityMetrics(BaseModel):
     pii_redacted: int = 0
     processing_time_ms: float = 0.0
     guardian_metrics: Optional[GuardianMetrics] = None
-
-
-class ChatRequest(BaseModel):
-    """Request schema for /chat endpoint."""
-
-    input: Dict[str, Any]  # Contains: prompt, model, moderation, output_format
-    client_ip: Optional[str] = None
-    user_agent: Optional[str] = None
-
-    # Structured Configuration
-    sentinel_config: Optional[SentinelConfig] = SentinelConfig()
-    guardian_config: Optional[GuardianConfig] = None  # None means defaults (all false)
 
 
 class ChatResponse(BaseModel):

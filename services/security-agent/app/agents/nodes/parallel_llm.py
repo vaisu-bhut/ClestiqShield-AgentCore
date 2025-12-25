@@ -53,15 +53,19 @@ async def parallel_llm_node(state: Dict[str, Any]) -> Dict[str, Any]:
     requested_model = input_data.get("model", "")
     moderation = input_data.get("moderation", "moderate")
     output_format = input_data.get("output_format", "json")
+    max_output_tokens = input_data.get("max_output_tokens")
 
     model_name = get_model_name(requested_model)
 
     logger.info(
-        "🚀 Starting parallel LLM execution", model=model_name, query_length=len(query)
+        "🚀 Starting parallel LLM execution",
+        model=model_name,
+        query_length=len(query),
+        max_tokens=max_output_tokens,
     )
 
     try:
-        llm = get_llm(model_name)
+        llm = get_llm(model_name, max_tokens=max_output_tokens)
 
         # Define parallel tasks
         async def generate_response():
@@ -70,6 +74,8 @@ async def parallel_llm_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 SystemMessage(content="You are a helpful AI assistant."),
                 HumanMessage(content=query),
             ]
+
+            # Reverting bind logic due to ineffectiveness in this env
             start = time.perf_counter()
             response = await llm.ainvoke(messages)
             latency = (time.perf_counter() - start) * 1000
@@ -89,6 +95,18 @@ async def parallel_llm_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     response_text = str(content)
             else:
                 response_text = str(response)
+
+            # Manual truncation fallback if LLM ignores max_output_tokens
+            if max_output_tokens:
+                # Approx 4 chars per token safe limit
+                char_limit = max_output_tokens * 4
+                if len(response_text) > char_limit:
+                    logger.warning(
+                        "Manually truncating response",
+                        original_len=len(response_text),
+                        limit=char_limit,
+                    )
+                    response_text = response_text[:char_limit] + "..."
 
             # Token usage
             input_tokens = output_tokens = 0
@@ -230,7 +248,7 @@ Respond with JSON only:
         response_text = response_result["text"]
 
         # Guardian validation
-        request = state.get("request")
+        guardian_config = state.get("guardian_config")
         guardrails = input_data.get("guardrails", {})
         original_query = input_data.get("prompt", "")
 
@@ -240,30 +258,30 @@ Respond with JSON only:
             output_format,
             guardrails=guardrails,
             original_query=original_query,
-            # Pass Guardian feature flags from request
-            enable_content_filter=request.guardian_config.enable_content_filter
-            if request and request.guardian_config
+            # Pass Guardian feature flags from config
+            enable_content_filter=guardian_config.enable_content_filter
+            if guardian_config
             else False,
-            enable_pii_scanner=request.guardian_config.enable_pii_scanner
-            if request and request.guardian_config
+            enable_pii_scanner=guardian_config.enable_pii_scanner
+            if guardian_config
             else False,
-            enable_toon_decoder=request.guardian_config.enable_toon_decoder
-            if request and request.guardian_config
+            enable_toon_decoder=guardian_config.enable_toon_decoder
+            if guardian_config
             else False,
-            enable_hallucination_detector=request.guardian_config.enable_hallucination_detector
-            if request and request.guardian_config
+            enable_hallucination_detector=guardian_config.enable_hallucination_detector
+            if guardian_config
             else False,
-            enable_citation_verifier=request.guardian_config.enable_citation_verifier
-            if request and request.guardian_config
+            enable_citation_verifier=guardian_config.enable_citation_verifier
+            if guardian_config
             else False,
-            enable_tone_checker=request.guardian_config.enable_tone_checker
-            if request and request.guardian_config
+            enable_tone_checker=guardian_config.enable_tone_checker
+            if guardian_config
             else False,
-            enable_refusal_detector=request.guardian_config.enable_refusal_detector
-            if request and request.guardian_config
+            enable_refusal_detector=guardian_config.enable_refusal_detector
+            if guardian_config
             else False,
-            enable_disclaimer_injector=request.guardian_config.enable_disclaimer_injector
-            if request and request.guardian_config
+            enable_disclaimer_injector=guardian_config.enable_disclaimer_injector
+            if guardian_config
             else False,
         )
 

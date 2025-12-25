@@ -207,9 +207,10 @@ async def toon_conversion_node(state: Dict[str, Any]) -> Dict[str, Any]:
     from app.core.metrics import get_security_metrics, track_latency
     import time
 
-    # Check if TOON conversion is enabled via request
-    request = state.get("request")
-    if not request or not request.sentinel_config.enable_toon_conversion:
+    # Check if TOON conversion is enabled via sentinel_config
+    sentinel_config = state.get("sentinel_config")
+
+    if not sentinel_config or not sentinel_config.enable_toon_conversion:
         return {
             **state,
             "toon_query": None,

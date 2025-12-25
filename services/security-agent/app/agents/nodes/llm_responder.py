@@ -46,22 +46,39 @@ def get_model_name(requested: str) -> str:
     return SUPPORTED_MODELS.get(requested.lower().strip(), default_model)
 
 
-def get_llm(model_name: str) -> Any:
+def get_llm(model_name: str, max_tokens: Optional[int] = None) -> Any:
     """Get or create LLM instance."""
     global _llm_cache
 
-    if model_name not in _llm_cache:
+    settings = get_settings()
+    effective_max_tokens = max_tokens or settings.LLM_MAX_TOKENS
+
+    # Include max_tokens in cache key to support varying output lengths
+    cache_key = f"{model_name}_{effective_max_tokens}"
+
+    if cache_key not in _llm_cache:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        settings = get_settings()
-        _llm_cache[model_name] = ChatGoogleGenerativeAI(
+        _llm_cache[cache_key] = ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=settings.GEMINI_API_KEY,
-            max_tokens=settings.LLM_MAX_TOKENS,
+            max_output_tokens=effective_max_tokens,
         )
-        logger.info("Created LLM", model=model_name)
+        logger.info(
+            "Created LLM instance",
+            model=model_name,
+            max_output_tokens=effective_max_tokens,
+            cache_key=cache_key,
+        )
+    else:
+        logger.info(
+            "Reusing cached LLM",
+            model=model_name,
+            max_output_tokens=effective_max_tokens,
+            cache_key=cache_key,
+        )
 
-    return _llm_cache[model_name]
+    return _llm_cache[cache_key]
 
 
 async def call_guardian(
@@ -144,10 +161,12 @@ async def llm_responder_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     model_name = get_model_name(requested_model)
 
-    logger.info("LLM request", model=model_name)
+    max_output_tokens = input_data.get("max_output_tokens")
+
+    logger.info("LLM request", model=model_name, max_tokens=max_output_tokens)
 
     try:
-        llm = get_llm(model_name)
+        llm = get_llm(model_name, max_tokens=max_output_tokens)
 
         messages = [
             SystemMessage(content="You are a helpful AI assistant."),

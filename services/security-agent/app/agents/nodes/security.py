@@ -97,11 +97,11 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
     }
 
     try:
-        # Get request object for feature flags
-        request = state.get("request")
+        # Get feature flags from state (injected by main.py based on simplified request)
+        sentinel_config = state.get("sentinel_config")
 
-        # Step 1: Input Sanitization (if enabled via request)
-        if request and request.sentinel_config.enable_sanitization:
+        # Step 1: Input Sanitization (if enabled)
+        if sentinel_config and sentinel_config.enable_sanitization:
             stage_start = time.perf_counter()
             sanitized_input, warnings = InputSanitizer.sanitize_input(user_input)
             stage_latency = (time.perf_counter() - stage_start) * 1000
@@ -117,9 +117,9 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
             if warnings:
                 logger.info("Sanitization warnings", warnings=warnings)
 
-        # Step 2: PII Detection and Pseudonymization (if enabled via request)
+        # Step 2: PII Detection and Pseudonymization (if enabled)
         pii_mapping = {}
-        if request and request.sentinel_config.enable_pii_redaction:
+        if sentinel_config and sentinel_config.enable_pii_redaction:
             stage_start = time.perf_counter()
             pseudonymized_input, pii_detections, pii_mapping = (
                 PIIRedactor.pseudonymize_pii(user_input)
@@ -154,39 +154,39 @@ async def security_check(state: AgentState) -> Dict[str, Any]:
         stage_start = time.perf_counter()
         threats = []
 
-        # SQL Injection Detection (if enabled via request)
-        if request and request.sentinel_config.enable_sql_injection_detection:
+        # SQL Injection Detection
+        if sentinel_config and sentinel_config.enable_sql_injection_detection:
             sql_threat = ThreatDetector.detect_sql_injection(user_input)
             if sql_threat["detected"]:
                 threats.append(sql_threat)
 
-        # XSS Detection (if enabled via request)
-        if request and request.sentinel_config.enable_xss_protection:
+        # XSS Detection
+        if sentinel_config and sentinel_config.enable_xss_protection:
             xss_threat = ThreatDetector.detect_xss(user_input)
             if xss_threat["detected"]:
                 threats.append(xss_threat)
 
-        # Command Injection Detection (if enabled via request)
-        if request and request.sentinel_config.enable_command_injection_detection:
+        # Command Injection Detection
+        if sentinel_config and sentinel_config.enable_command_injection_detection:
             cmd_threat = ThreatDetector.detect_command_injection(user_input)
             if cmd_threat["detected"]:
                 threats.append(cmd_threat)
 
         # Path Traversal Detection (run if any threat detection enabled)
-        if request and (
-            request.sentinel_config.enable_sql_injection_detection
-            or request.sentinel_config.enable_xss_protection
-            or request.sentinel_config.enable_command_injection_detection
+        if sentinel_config and (
+            sentinel_config.enable_sql_injection_detection
+            or sentinel_config.enable_xss_protection
+            or sentinel_config.enable_command_injection_detection
         ):
             path_threat = ThreatDetector.detect_path_traversal(user_input)
             if path_threat["detected"]:
                 threats.append(path_threat)
 
         # Record latency if any threat detection was run
-        if request and (
-            request.sentinel_config.enable_sql_injection_detection
-            or request.sentinel_config.enable_xss_protection
-            or request.sentinel_config.enable_command_injection_detection
+        if sentinel_config and (
+            sentinel_config.enable_sql_injection_detection
+            or sentinel_config.enable_xss_protection
+            or sentinel_config.enable_command_injection_detection
         ):
             stage_latency = (time.perf_counter() - stage_start) * 1000
             logger.info(f"Threat Detection completed in {stage_latency:.2f}ms")

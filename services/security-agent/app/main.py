@@ -41,41 +41,77 @@ from app.schemas.security import (
     ChatResponse,
     SecurityMetrics,
     GuardianMetrics,
+    SentinelConfig,
+    GuardianConfig,
 )
-from app.core.metrics import get_security_metrics
+from app.core.metrics import get_security_metrics, MetricsDataBuilder
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": settings.DD_SERVICE}
+    return {"status": "ok", "service": "sentinel"}
 
 
 @app.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
 async def chat(request: ChatRequest):
     """
-    Process a chat request through the security graph.
-
-    All metrics automatically sent to Datadog via OTel.
+    Sentinel Chat Endpoint.
+    Orchestrates input security, LLM generation, and output validation.
     """
+    logger.info("Received chat request", model=request.model)
+
     start_time = time.perf_counter()
 
-    logger.info(
-        "Chat request received",
-        client_ip=request.client_ip,
-        model=request.input.get("model"),
-        moderation=request.input.get("moderation"),
+    # Map Simplified Settings to Internal Configs
+    settings = request.settings
+
+    # Sentinel Config (Input)
+    sentinel_config = SentinelConfig(
+        enable_sanitization=settings.sanitize_input,
+        enable_pii_redaction=settings.pii_masking,
+        enable_sql_injection_detection=settings.detect_threats,
+        enable_xss_protection=settings.detect_threats,
+        enable_command_injection_detection=settings.detect_threats,
+        enable_toon_conversion=settings.toon_mode,
+        enable_llm_forward=settings.enable_llm_forward,
     )
 
+    # Guardian Config (Output)
+    guardian_config = GuardianConfig(
+        enable_content_filter=settings.content_filter,
+        enable_pii_scanner=settings.pii_masking,
+        enable_toon_decoder=settings.toon_mode,
+        enable_hallucination_detector=settings.hallucination_check,
+        enable_citation_verifier=settings.citation_check,
+        enable_tone_checker=settings.tone_check,
+    )
+
+    input_data = {
+        "prompt": request.query,
+        "model": request.model,
+        "moderation": request.moderation,
+        "output_format": request.output_format,
+        "max_output_tokens": request.max_output_tokens,
+    }
+
     initial_state = {
-        "input": request.input,
+        "input": input_data,
+        "request": request,
+        "client_ip": request.client_ip,
+        "user_agent": request.user_agent,
         "security_score": 0.0,
         "is_blocked": False,
         "block_reason": None,
-        "client_ip": request.client_ip,
-        "user_agent": request.user_agent,
+        "sanitized_input": None,
+        "pii_detections": [],
+        "redacted_input": None,
+        "detected_threats": [],
+        "llm_response": None,
         "metrics_data": None,
-        "request": request,  # Pass request for feature flags
+        # INTERNAL CONFIGS
+        "sentinel_config": sentinel_config,
+        "guardian_config": guardian_config,
     }
 
     try:
@@ -91,36 +127,29 @@ async def chat(request: ChatRequest):
     else:
         logger.info(
             "Request processed",
-            model=request.input.get("model", settings.LLM_MODEL_NAME),
+            model=request.model,
             tokens_saved=result.get("token_savings", 0),
             processing_time_ms=round(processing_time_ms, 2),
         )
 
-    # Construct Guardian Metrics (only if available)
-    guardian_metrics = None
-    if request.guardian_config:  # Only build if Guardian was potentially involved
-        # Check if we have any actual guardian results manually to avoid sending empty object
-        # Or just filter based on config.
-        # But for now, let's just map the fields.
-        g_metrics = GuardianMetrics(
-            hallucination_detected=result.get("hallucination_detected"),
-            citations_verified=result.get("citations_verified"),
-            tone_compliant=result.get("tone_compliant"),
-            disclaimer_injected=result.get("disclaimer_injected"),
-            false_refusal_detected=result.get("false_refusal_detected"),
-            toxicity_score=result.get("toxicity_score"),
-        )
-        # Only attach if at least one field is not None?
-        # Pydantic's exclude_none will handle the serialization, but we want to avoid returning an empty "guardian_metrics": {} if possible.
-        # However, ChatResponse.metrics.guardian_metrics is Optional.
-        # If we assign it an object with all Nones, exclude_none on the parent *should* strip keys inside, but leave guardian_metrics as empty dict?
-        # Actually exclude_none is recursive. So if g_metrics has all None, it serializes to {}.
-        # Ideally we prefer it to be None in that case.
-        if any(v is not None for v in g_metrics.model_dump().values()):
-            guardian_metrics = g_metrics
+    # Construct Guardian Metrics
+    guardian_keys = [
+        "hallucination_detected",
+        "citations_verified",
+        "tone_compliant",
+        "disclaimer_injected",
+        "false_refusal_detected",
+        "toxicity_score",
+    ]
 
-    # Construct Security Metrics
-    metrics = SecurityMetrics(
+    # Only include metrics that are actually present (not None)
+    present_metrics = {k: result[k] for k in guardian_keys if result.get(k) is not None}
+
+    guardian_metrics = None
+    if present_metrics:
+        guardian_metrics = GuardianMetrics(**present_metrics)
+
+    metrics_obj = SecurityMetrics(
         security_score=result.get("security_score", 0.0),
         tokens_saved=result.get("token_savings", 0),
         llm_tokens=result.get("llm_tokens_used"),
@@ -135,5 +164,5 @@ async def chat(request: ChatRequest):
         is_blocked=result.get("is_blocked", False),
         block_reason=result.get("block_reason"),
         llm_response=result.get("llm_response"),
-        metrics=metrics,
+        metrics=metrics_obj,
     )

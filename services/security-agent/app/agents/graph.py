@@ -36,11 +36,11 @@ def create_agent_graph():
         if state.get("is_blocked"):
             return END
 
-        # Get request for TOON feature flag
-        request = state.get("request")
+        # Get sentinel config for TOON feature flag
+        sentinel_config = state.get("sentinel_config")
 
         # If TOON conversion enabled, go there first
-        if request and request.sentinel_config.enable_toon_conversion:
+        if sentinel_config and sentinel_config.enable_toon_conversion:
             return "toon_converter"
 
         # Otherwise, go directly to parallel LLM

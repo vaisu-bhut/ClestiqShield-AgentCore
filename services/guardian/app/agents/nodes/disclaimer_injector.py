@@ -115,7 +115,7 @@ async def disclaimer_injector_node(state: Dict[str, Any]) -> Dict[str, Any]:
         or not request.config
         or not request.config.enable_disclaimer_injector
     ):
-        return {**state, "disclaimer_injected": False}
+        return state
 
     metrics = get_guardian_metrics()
     start_time = time.perf_counter()

@@ -191,7 +191,7 @@ async def parallel_llm_validator_node(state: Dict[str, Any]) -> Dict[str, Any]:
         """Run toxicity/content safety check."""
         if request and request.config and request.config.enable_content_filter:
             return await toxicity_check(llm_response)
-        return {"type": "toxicity", "result": {"toxicity_score": 0.0, "categories": []}}
+        return None
 
     async def run_hallucination_check():
         """Run hallucination detection."""
@@ -203,14 +203,7 @@ async def parallel_llm_validator_node(state: Dict[str, Any]) -> Dict[str, Any]:
             and original_query
         ):
             return await hallucination_check(llm_response, original_query)
-        return {
-            "type": "hallucination",
-            "result": {
-                "hallucination_detected": False,
-                "confidence": 0.0,
-                "details": None,
-            },
-        }
+        return None
 
     async def run_tone_check():
         """Run tone analysis."""
@@ -218,14 +211,7 @@ async def parallel_llm_validator_node(state: Dict[str, Any]) -> Dict[str, Any]:
             guardrails = state.get("guardrails") or {}
             desired_tone = guardrails.get("brand_tone", "professional")
             return await tone_check(llm_response, desired_tone)
-        return {
-            "type": "tone",
-            "result": {
-                "tone_compliant": True,
-                "detected_tone": "unknown",
-                "violation_reason": None,
-            },
-        }
+        return None
 
     # Add tasks to the list
     tasks.append(run_toxicity_check())
@@ -258,6 +244,9 @@ async def parallel_llm_validator_node(state: Dict[str, Any]) -> Dict[str, Any]:
     updated_state = {**state}
 
     for result in results:
+        if result is None:
+            continue
+
         if isinstance(result, Exception):
             logger.error("Parallel check failed", error=str(result))
             continue
