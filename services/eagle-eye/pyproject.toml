@@ -21,6 +21,7 @@ pydantic-settings = "^2.1.0"
 structlog = "^24.1.0"
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 python-multipart = "^0.0.9"
+datadog = "^0.48.0"
 
 [build-system]
 requires = ["poetry-core"]

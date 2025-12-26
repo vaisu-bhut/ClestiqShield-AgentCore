@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     DD_SERVICE: str = "clestiq-shield-eagle-eye"
     DD_ENV: str = "production"
     DD_VERSION: str = "1.0.0"
+    DD_AGENT_HOST: str = "datadog-agent"
+    DD_DOGSTATSD_PORT: int = 8125
+    DD_DOGSTATSD_SOCKET: str = ""
 
     class Config:
         case_sensitive = True

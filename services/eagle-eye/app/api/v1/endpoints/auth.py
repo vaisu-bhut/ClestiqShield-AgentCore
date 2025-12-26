@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas import UserCreate, UserResponse, TokenWithUser
 from datetime import timedelta
 import structlog
+from app.core.telemetry import telemetry
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -38,6 +39,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     await db.refresh(new_user)
 
     logger.info("User registered", user_id=str(new_user.id), email=new_user.email)
+    telemetry.increment("clestiq.eagleeye.users.created")
     return new_user
 
 

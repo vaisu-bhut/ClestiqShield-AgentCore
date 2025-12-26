@@ -8,6 +8,7 @@ from app.schemas import ApplicationCreate, ApplicationResponse, ApplicationUpdat
 import structlog
 from typing import List
 from app.api.deps import get_current_user
+from app.core.telemetry import telemetry
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -37,6 +38,7 @@ async def create_app(
         )
     await db.refresh(new_app)
     logger.info("Application created", app_id=str(new_app.id))
+    telemetry.increment("clestiq.eagleeye.apps.created")
     return new_app
 
 
@@ -122,4 +124,5 @@ async def delete_app(
 
     await db.delete(app)
     await db.commit()
+    telemetry.increment("clestiq.eagleeye.apps.deleted")
     return {"message": "Application deleted"}

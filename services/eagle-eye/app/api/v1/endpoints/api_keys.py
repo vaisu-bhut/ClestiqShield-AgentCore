@@ -9,6 +9,7 @@ from app.models.app import Application
 from app.schemas import ApiKeyCreate, ApiKeyResponse, ApiKeySecret
 import structlog
 from typing import List
+from app.core.telemetry import telemetry
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -53,7 +54,7 @@ async def create_api_key(
     await db.refresh(new_key)
 
     # Return Schema with SECRET plain key
-    return ApiKeySecret(
+    response_obj = ApiKeySecret(
         id=new_key.id,
         key_prefix=new_key.key_prefix,
         name=new_key.name,
@@ -62,6 +63,10 @@ async def create_api_key(
         is_active=new_key.is_active,
         api_key=plain_key,  # IMPORTANT: Shown only once
     )
+
+    telemetry.increment("clestiq.eagleeye.api_keys.created", tags=[f"app:{app.name}"])
+
+    return response_obj
 
 
 @router.get("/apps/{app_id}/keys", response_model=List[ApiKeyResponse])
@@ -111,4 +116,5 @@ async def revoke_api_key(
 
     await db.delete(key)  # Or set is_active = False for soft delete
     await db.commit()
+    telemetry.increment("clestiq.eagleeye.api_keys.revoked", tags=[f"app:{app.name}"])
     return {"message": "API Key revoked"}
