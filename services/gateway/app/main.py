@@ -7,7 +7,10 @@ from app.core.config import get_settings
 
 
 settings = get_settings()
-from app.core.db import engine, Base
+
+from app.core.rate_limiter import RateLimiter
+
+rate_limiter = RateLimiter()
 
 
 @asynccontextmanager
@@ -23,6 +26,7 @@ async def lifespan(app: FastAPI):
     logger.info("Gateway service startup complete")
     yield
     # Shutdown
+    await rate_limiter.close()
     logger.info("Gateway service shutdown")
 
 

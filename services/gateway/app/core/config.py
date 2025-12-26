@@ -9,6 +9,11 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str
+    REDIS_URL: str = "redis://redis:6379/0"
+
+    # Security
+    SECRET_KEY: str = "change_this_to_a_strong_secret_key"
+    ALGORITHM: str = "HS256"
 
     # Datadog APM
     TELEMETRY_ENABLED: bool = True

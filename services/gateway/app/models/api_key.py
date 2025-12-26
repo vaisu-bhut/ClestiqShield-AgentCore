@@ -8,6 +8,7 @@ from app.core.db import Base
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     key_prefix = Column(String, nullable=False)

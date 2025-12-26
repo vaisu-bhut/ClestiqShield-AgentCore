@@ -16,6 +16,7 @@ from app.schemas.gateway import (
     TokenUsage,
 )
 from app.core.telemetry import telemetry
+from app.main import rate_limiter
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -63,6 +64,51 @@ async def chat_request(
         model=body.model,
         moderation=body.moderation,
     )
+
+    # --- RATE LIMIT CHECK (Token Usage) ---
+    # Convert UUID to str for Redis key
+    key_id = str(api_key.id)
+    # 1. Check if disabled (handled by deps.get_api_key/DB, but we double check or just trust DB)
+
+    # 2. Check Token Limit: 10k per 5 mins (300s)
+    token_limit_key = f"rate:tokens:{key_id}"
+    TOKEN_LIMIT = 5000
+    TOKEN_WINDOW = 300
+
+    is_allowed = await rate_limiter.check_current_usage(token_limit_key, TOKEN_LIMIT)
+    if not is_allowed:
+        # Check penalties
+        violation_key = f"rate:violations:{key_id}"
+        VIOLATION_WINDOW = 1200  # 20 mins
+
+        violations = await rate_limiter.record_violation(
+            violation_key, VIOLATION_WINDOW
+        )
+        logger.warning("Rate limit exceeded", key_id=key_id, violations=violations)
+
+        if violations >= 2:
+            # DISABLE KEY
+            logger.critical(
+                "Disabling API Key due to repeated violations",
+                key_id=key_id,
+                app_id=str(current_app.id),
+            )
+            api_key.is_active = False
+            await db.commit()
+
+            telemetry.increment(
+                "clestiq.gateway.keys_disabled", tags=[f"app:{current_app.name}"]
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API Key disabled due to repeated rate limit violations",
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Token rate limit exceeded (10k tokens / 5 mins)",
+        )
 
     # Get client info
     client_ip = request.client.host if request.client else None
@@ -213,6 +259,9 @@ async def chat_request(
     from sqlalchemy import func
 
     api_key.last_used_at = func.now()
+    api_key.last_used_at = func.now()
+    if api_key.request_count is None:
+        api_key.request_count = 0
     api_key.request_count += 1
 
     # Update usage_data JSON
@@ -271,6 +320,15 @@ async def chat_request(
             response_metrics.token_usage.total_tokens,
             tags=[f"app:{current_app.name}", f"model:{model_used}", "type:total"],
         )
+
+        # --- UPDATE RATE LIMITER ---
+        # Increment token usage
+        # We count total tokens (input + output)
+        total_tokens_used = response_metrics.token_usage.total_tokens
+        if total_tokens_used > 0:
+            await rate_limiter.increment_and_check(
+                token_limit_key, total_tokens_used, TOKEN_LIMIT, TOKEN_WINDOW
+            )
 
     # 4. Tokens Saved (Efficiency)
     if response_metrics.tokens_saved > 0:

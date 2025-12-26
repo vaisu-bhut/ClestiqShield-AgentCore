@@ -25,6 +25,7 @@ services:
       - db
       - sentinel
       - datadog-agent
+      - redis
     volumes:
       - ./services/gateway/app:/app/app
       - dogstatsd-socket:/var/run/datadog
@@ -196,6 +197,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis - Rate Limiting & Caching
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - clestiq-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      com.datadoghq.tags.service: "clestiq-shield-redis"
+      com.datadoghq.tags.env: "development"
+      com.datadoghq.tags.version: "7.0.0"
+
   # Datadog Agent
   datadog-agent:
     image: gcr.io/datadoghq/agent:latest
@@ -257,3 +278,4 @@ networks:
 volumes:
   postgres_data:
   dogstatsd-socket:
+  redis_data:
