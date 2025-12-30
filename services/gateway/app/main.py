@@ -4,7 +4,10 @@ from contextlib import asynccontextmanager
 import structlog
 
 from app.core.config import get_settings
+from app.core.telemetry import setup_logging
 
+# Initialize Datadog APM instrumentation and logging
+setup_logging()
 
 settings = get_settings()
 
