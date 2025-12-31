@@ -21,7 +21,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: UUID
     full_name: Optional[str] = None
-    is_active: bool
+    is_active: bool = True
     created_at: datetime
 
     class Config:
