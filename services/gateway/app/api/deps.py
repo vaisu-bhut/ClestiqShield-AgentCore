@@ -30,15 +30,32 @@ async def get_api_key(
     result = await db.execute(
         select(ApiKey)
         .options(selectinload(ApiKey.application))
-        .filter(ApiKey.key_hash == hashed_key, ApiKey.is_active)
+        .filter(ApiKey.key_hash == hashed_key)
     )
     api_key_obj = result.scalars().first()
 
-    if not api_key_obj or not api_key_obj.application:
-        logger.warning("Authentication failed", api_key_prefix=api_key[:4] + "...")
+    if not api_key_obj:
+        logger.warning(
+            "Authentication failed: Key not found", api_key_prefix=api_key[:4] + "..."
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API Key",
+        )
+
+    if not api_key_obj.is_active:
+        logger.warning(
+            "Authentication failed: Key disabled", api_key_prefix=api_key[:4] + "..."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API Key blocked by application",
+        )
+
+    if not api_key_obj.application:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API Key (No App)",
         )
 
     return api_key_obj
