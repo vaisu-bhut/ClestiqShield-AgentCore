@@ -64,6 +64,8 @@ class ApiKeyResponse(BaseModel):
     created_at: datetime
     last_used_at: Optional[datetime] = None
     is_active: bool
+    request_count: int = 0
+    usage_data: Optional[dict] = None
 
     class Config:
         from_attributes = True
