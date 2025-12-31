@@ -21,7 +21,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: UUID
     full_name: Optional[str] = None
-    is_active: bool
+    is_active: bool = True
     created_at: datetime
 
     class Config:
@@ -64,6 +64,8 @@ class ApiKeyResponse(BaseModel):
     created_at: datetime
     last_used_at: Optional[datetime] = None
     is_active: bool
+    request_count: int = 0
+    usage_data: Optional[dict] = None
 
     class Config:
         from_attributes = True
