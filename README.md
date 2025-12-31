@@ -8,8 +8,8 @@
 ╚██████╗███████╗███████╗███████║   ██║   ██║╚██████╔╝    ███████║██║  ██║██║███████╗███████╗██████╔╝
  ╚═════╝╚══════╝╚══════╝╚══════╝   ╚═╝   ╚═╝ ╚══▀▀═╝     ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═════╝ 
                                                                                                       
-                    🛡️  AGENT CORE - AI Security Gateway  🛡️
-                  Multi-Layer Defense for LLM Applications
+🛡️  AGENT CORE - AI Security Gateway  🛡️
+Multi-Layer Defense for LLM Applications
 ```
 
 [![Version](https://img.shields.io/badge/Version-3.2.0-blue?style=for-the-badge&logo=semver)](/)
@@ -149,7 +149,7 @@ graph LR
     Auth -- Valid --> Limit{Rate Limit?}
     Auth -- Invalid --> 401[401 Unauth]
     
-    Limit -- OK --> Sentinel[Route to Sentinel]
+    Limit -- OK --> Sentinel[Route to Sentinel OR EagleEye]
     Limit -- Exceeded --> 429[429 Too Many Requests]
     
     style Req fill:#fff,stroke:#000,color:#000
