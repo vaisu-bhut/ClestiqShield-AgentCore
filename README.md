@@ -8,11 +8,11 @@
 ╚██████╗███████╗███████╗███████║   ██║   ██║╚██████╔╝    ███████║██║  ██║██║███████╗███████╗██████╔╝
  ╚═════╝╚══════╝╚══════╝╚══════╝   ╚═╝   ╚═╝ ╚══▀▀═╝     ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═════╝ 
                                                                                                       
-                            🛡️  AGENT CORE - AI Security Gateway  🛡️
-                          Multi-Layer Defense for LLM Applications
+                    🛡️  AGENT CORE - AI Security Gateway  🛡️
+                  Multi-Layer Defense for LLM Applications
 ```
 
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge&logo=semver)](/)
+[![Version](https://img.shields.io/badge/Version-3.2.0-blue?style=for-the-badge&logo=semver)](/)
 [![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge&logo=python&logoColor=white)](/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](/)
 [![Datadog](https://img.shields.io/badge/Datadog-Integrated-632CA6?style=for-the-badge&logo=datadog&logoColor=white)](/)
@@ -80,17 +80,18 @@ graph TD
     Gateway -- Rate Limits --> Redis
     
     %% Semantic Routing
-    Gateway -- "/auth, /apps" --> EagleEye
+    Gateway -- "/auth, /apps, /users" --> EagleEye
     EagleEye -- Data --> DB
     
-    Gateway -- "/chat" --> Sentinel
+    Gateway -- "/chat (Validated)" --> Sentinel
     Sentinel -- Threat Check --> Gemini
-    Sentinel -- Output Validation --> Guardian
+    Sentinel -- Generate Response --> Gemini
+    Sentinel -. Optional Validation .-> Guardian
     Guardian -- Hallucination Check --> Gemini
     
     %% Return Path
     Guardian -. Result .-> Sentinel
-    Sentinel -. Response .-> Gateway
+    Sentinel -- Response --> Gateway
     Gateway -- Final Response --> User
 
     %% Observability Connections (The Central Hub)
@@ -178,6 +179,7 @@ Sentinel analyzes incoming prompts *before* they reach the LLM. It focuses on **
 - 🛡️ **Threat Detection**: Blocks SQL Injection, XSS, Command Injection, and Jailbreak attempts.
 - 🎭 **TOON Conversion**: Threat-Obfuscated Object Notation for safe processing.
 - ⏭️ **LLM Forwarding**: Intelligent routing to allow or block LLM access based on threat level.
+- 🎼 **Orchestration**: Manages the LLM interaction and optionally delegates to Guardian.
 
 ```mermaid
 graph TD
